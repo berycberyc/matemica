@@ -56,3 +56,7 @@ button{font:17px Onest,sans-serif;border-radius:10px;cursor:pointer;border:1px s
 
 .tech{font:13px/1.4 ui-monospace,Menlo,monospace;color:#8a5a09;background:#fff6e6;
   border-radius:8px;padding:9px 11px;margin:10px 0;word-break:break-word}
+
+.small{width:auto;margin:0;padding:8px 13px;font-size:14px}
+.ghost.armed{color:var(--red);border-color:var(--red)}
+#app .topbar{margin-bottom:10px}

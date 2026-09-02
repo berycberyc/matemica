@@ -93,6 +93,27 @@ function keypad(onKey) {
   return pad;
 }
 
+
+function topbar() {
+  const bar = el("div", "topbar");
+  bar.appendChild(el("div", "who", S.user.full_name));
+  const out = el("button", "ghost small", T("exit"));
+  let armed = false;
+  out.onclick = () => {
+    if (!armed) { armed = true; out.textContent = T("sure"); out.classList.add("armed"); return; }
+    STORE.clear(); location.reload();
+  };
+  bar.appendChild(out);
+  return bar;
+}
+
+function page(card) {
+  const wrap = el("div");
+  wrap.appendChild(topbar());
+  wrap.appendChild(card);
+  return wrap;
+}
+
 function screenQuestion(task) {
   S.current = task; S.shownAt = performance.now();
   const stem = (LANG === "kk" && task.stem_kk) ? task.stem_kk : task.stem_ru;
@@ -142,7 +163,7 @@ function screenQuestion(task) {
     } catch { }
   };
   box.appendChild(ask);
-  show(box);
+  show(page(box));
 }
 
 async function saveAnswer(task, given, seconds) {
