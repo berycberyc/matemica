@@ -1,14 +1,19 @@
-// Движок диагностики. Чистая логика без экранов и без сети —
+// Движок диагностики. Чистая логика: ни экранов, ни сети —
 // поэтому её можно прогнать отдельно и убедиться, что ветвление верное.
+//
+// Внутри темы три этажа: 1 — приём, 2 — стандартная задача, 3 — нужна идея.
+// Начинаем со второго. Ответил быстро и верно — поднимаем на третий.
+// Ошибся — опускаем на первый. Провалил первый — уходим вниз по зависимостям.
 
 const S = {
   user: null, topics: {}, prereq: {}, dependent: {},
   tasks: [], byTopic: {}, session: null, items: [],
-  status: {}, pendingSecond: [], descent: [], used: new Set(),
+  status: {}, nextLevel: {}, cameDown: {}, focus: [], descent: [], used: new Set(),
   current: null, shownAt: 0, windowOpen: false, windowCheckedAt: 0
 };
 
-const SLOW_FACTOR = 1.5;   // дольше полутора целевых времён — «шатко»
+const SLOW_FACTOR = 1.5;    // дольше полутора целевых времён — «шатко»
+const START_LEVEL = 2;      // с какого этажа начинаем незнакомую тему
 
 function walk(map, start) {
   const seen = new Set(), stack = [...(map[start] || [])];
@@ -19,91 +24,91 @@ function walk(map, start) {
   return [...seen];
 }
 
-// Порядок входа: сверху вниз. Первым спрашиваем то, под чем стоит больше всего тем,
-// потому что один верный ответ там закрывает сразу много.
+// Порядок входа: сверху вниз. Первой спрашиваем тему, под которой стоит больше всего
+// других, потому что один верный ответ там закрывает сразу много.
 function entryOrder() {
   return Object.keys(S.byTopic).map(Number)
     .sort((a, b) => walk(S.prereq, b).length - walk(S.prereq, a).length || a - b);
 }
 
-function applyResult(topic, correct, seconds, target, dontknow) {
-  if (correct) {
-    const fast = seconds <= target * SLOW_FACTOR;
-    S.status[topic] = fast ? "ok" : "shaky";
-    S.pendingSecond = S.pendingSecond.filter(t => t !== topic);
-    // медленный верный ответ темы под собой НЕ закрывает
-    if (fast) walk(S.prereq, topic).forEach(p => { if (!S.status[p]) S.status[p] = "ok_inferred"; });
-    return;
-  }
-  const second = S.pendingSecond.includes(topic);
-  if (!second && !dontknow) { S.pendingSecond.push(topic); return; }   // первая ошибка — не приговор
-  S.pendingSecond = S.pendingSecond.filter(t => t !== topic);
-  S.status[topic] = "fail";
-  (S.prereq[topic] || []).forEach(p => { if (!S.status[p] && !S.descent.includes(p)) S.descent.push(p); });
+function inferBelow(topic) {
+  walk(S.prereq, topic).forEach(p => { if (!S.status[p]) S.status[p] = "ok_inferred"; });
+}
+
+function markEarlyAbove(topic) {
   walk(S.dependent, topic).forEach(d => { if (!S.status[d]) S.status[d] = "early"; });
 }
 
+function applyResult(topic, level, correct, seconds, target, dontknow) {
+  S.focus = S.focus.filter(t => t !== topic);
+  const fast = seconds <= target * SLOW_FACTOR;
+
+  if (correct && !dontknow) {
+    if (!fast) { S.status[topic] = "shaky"; return; }
+    if (S.cameDown[topic]) { S.status[topic] = "partial"; inferBelow(topic); return; }
+    if (level >= 3) { S.status[topic] = "ok"; inferBelow(topic); return; }
+    S.nextLevel[topic] = level + 1;
+    S.focus.push(topic);
+    return;
+  }
+
+  if (level > 1) {
+    S.nextLevel[topic] = level - 1;
+    S.cameDown[topic] = true;
+    S.focus.push(topic);
+    return;
+  }
+
+  S.status[topic] = "fail";
+  (S.prereq[topic] || []).forEach(p => {
+    if (!S.status[p] && !S.descent.includes(p)) { S.descent.push(p); S.nextLevel[p] = 1; }
+  });
+  markEarlyAbove(topic);
+}
+
 function replay() {
-  S.status = {}; S.pendingSecond = []; S.descent = []; S.used = new Set();
+  S.status = {}; S.nextLevel = {}; S.cameDown = {}; S.focus = []; S.descent = []; S.used = new Set();
   for (const it of S.items) {
     S.used.add(it.task_id);
     const task = S.tasks.find(t => t.id === it.task_id);
-    const target = task ? task.target_seconds : 90;
-    applyResult(it.topic_ord, it.is_correct === true, it.seconds || 0, target, it.given === "?");
+    applyResult(it.topic_ord, task ? task.level : 2, it.is_correct === true,
+                it.seconds || 0, task ? task.target_seconds : 90, it.given === "?");
   }
 }
 
-function freeTask(topic) {
-  const list = S.byTopic[topic] || [];
-  return list.find(t => !S.used.has(t.id)) || null;
+function freeTask(topic, level) {
+  const list = (S.byTopic[topic] || []).filter(t => !S.used.has(t.id));
+  if (!list.length) return null;
+  return list.find(t => t.level === level) || null;
 }
 
 function pickNext() {
-  for (const t of S.pendingSecond) { const q = freeTask(t); if (q) return q; }
+  for (let i = S.focus.length - 1; i >= 0; i--) {
+    const t = S.focus[i], q = freeTask(t, S.nextLevel[t]);
+    if (q) return q;
+  }
   for (const t of S.descent) {
-    if (!S.status[t] || S.status[t] === "ok_inferred") { const q = freeTask(t); if (q) return q; }
+    if (!S.status[t] || S.status[t] === "ok_inferred") {
+      const q = freeTask(t, S.nextLevel[t] || 1);
+      if (q) return q;
+    }
   }
   for (const t of entryOrder()) {
-    if (!S.status[t]) { const q = freeTask(t); if (q) return q; }
+    if (!S.status[t] && !S.cameDown[t]) {
+      const q = freeTask(t, S.nextLevel[t] || START_LEVEL);
+      if (q) return q;
+    }
   }
   return null;
 }
 
-async function isWindowOpen() {
-  if (Date.now() - S.windowCheckedAt < 60000) return S.windowOpen;
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const rows = await API.get("lessons",
-      "group_id=eq." + S.user.group_id + "&on_date=eq." + today + "&is_open=is.true&select=id");
-    S.windowOpen = rows.length > 0;
-  } catch { S.windowOpen = false; }
-  S.windowCheckedAt = Date.now();
-  return S.windowOpen;
-}
-
-async function startSession() {
-  const open = await API.get("diag_sessions",
-    "student_id=eq." + S.user.id + "&status=eq.in_progress&select=*&order=pass_no.desc&limit=1");
-  if (open.length) { S.session = open[0]; }
-  else {
-    const all = await API.get("diag_sessions", "student_id=eq." + S.user.id + "&select=pass_no");
-    const next = all.length ? Math.max(...all.map(r => r.pass_no)) + 1 : 1;
-    const made = await API.post("diag_sessions",
-      [{ student_id: S.user.id, pass_no: next, supervised: await isWindowOpen() }]);
-    S.session = made[0];
-  }
-  S.items = await API.get("diag_items",
-    "session_id=eq." + S.session.id + "&select=*&order=pos.asc");
-  replay();
-}
-
-// Сравнение ответа. 2/4 и 1/2 — одно и то же число, форма не наказывается.
+// Сверка ответа. 2/4 и 1/2 — одно и то же число, форма не наказывается.
 function toNumber(s) {
   const t = String(s).trim().replace(",", ".").replace(/\s+/g, "");
   if (!t) return null;
   if (t.includes("/")) {
-    const [a, b] = t.split("/");
-    const x = parseFloat(a), y = parseFloat(b);
+    const p = t.split("/");
+    const x = parseFloat(p[0]), y = parseFloat(p[1]);
     if (!isFinite(x) || !isFinite(y) || y === 0) return null;
     return x / y;
   }
@@ -114,15 +119,18 @@ function toNumber(s) {
 function judge(task, given) {
   if (given === "?") return { correct: false, code: null };
   if (task.answer_type === "choice") {
-    const hit = task.options.find(o => o.body === given);
+    const hit = (task.options || []).find(o => o.body === given);
     return { correct: !!(hit && hit.is_correct), code: hit && !hit.is_correct ? hit.error_code : null };
   }
   const a = toNumber(given), b = task.answer_num === null ? null : Number(task.answer_num);
   if (a === null || b === null) return { correct: false, code: null };
-  if (Math.abs(a - b) < 1e-9) return { correct: true, code: null };
-  const miss = (task.options || []).find(o => !o.is_correct && Math.abs(toNumber(o.body) - a) < 1e-9);
+  if (Math.abs(a - b) < 1e-6) return { correct: true, code: null };
+  const miss = (task.options || []).find(function (o) {
+    const v = toNumber(o.body);
+    return !o.is_correct && v !== null && Math.abs(v - a) < 1e-6;
+  });
   return { correct: false, code: miss ? miss.error_code : null };
 }
 
-
-if (typeof module !== 'undefined') module.exports = { S, walk, entryOrder, applyResult, replay, freeTask, pickNext, judge, toNumber, SLOW_FACTOR };
+if (typeof module !== "undefined") module.exports =
+  { S, walk, entryOrder, applyResult, replay, freeTask, pickNext, judge, toNumber, SLOW_FACTOR, START_LEVEL };

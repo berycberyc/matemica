@@ -125,7 +125,7 @@ async function saveAnswer(task, given, seconds) {
     return;
   }
   S.used.add(task.id);
-  applyResult(task.topic_ord, v.correct, seconds, task.target_seconds, given === "?");
+  applyResult(task.topic_ord, task.level, v.correct, seconds, task.target_seconds, given === "?");
   step();
 }
 
