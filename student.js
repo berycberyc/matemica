@@ -24,6 +24,36 @@ async function loadCatalog() {
   for (const k in S.byTopic) S.byTopic[k].sort((a, b) => a.level - b.level);
 }
 
+
+async function isWindowOpen() {
+  if (Date.now() - S.windowCheckedAt < 60000) return S.windowOpen;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = await API.get("lessons",
+      "group_id=eq." + S.user.group_id + "&on_date=eq." + today + "&is_open=is.true&select=id");
+    S.windowOpen = rows.length > 0;
+  } catch { S.windowOpen = false; }
+  S.windowCheckedAt = Date.now();
+  return S.windowOpen;
+}
+
+async function startSession() {
+  const open = await API.get("diag_sessions",
+    "student_id=eq." + S.user.id + "&status=eq.in_progress&select=*&order=pass_no.desc&limit=1");
+  if (open.length) {
+    S.session = open[0];
+  } else {
+    const all = await API.get("diag_sessions", "student_id=eq." + S.user.id + "&select=pass_no");
+    const next = all.length ? Math.max.apply(null, all.map(r => r.pass_no)) + 1 : 1;
+    const made = await API.post("diag_sessions",
+      [{ student_id: S.user.id, pass_no: next, supervised: await isWindowOpen() }]);
+    S.session = made[0];
+  }
+  S.items = await API.get("diag_items",
+    "session_id=eq." + S.session.id + "&select=*&order=pos.asc");
+  replay();
+}
+
 // ------------------------------------------------------------------ экраны
 
 function screenLogin(msg) {
