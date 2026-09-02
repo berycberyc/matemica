@@ -1,64 +1,64 @@
-// Кабинет ученика: диагностика и задачи на сегодня.
-// Логика ветвления живёт в engine.ts.
+// Кабинет ученика. Диагностика — тихий замер. Тренировка — то, чем живут пять дней в неделю.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { dict } from "../lib/i18n";
 import { Card, Primary, Quiet, Tech } from "../components/Ui";
-import { Home } from "./Home";
+import { Home, type HomeData } from "./Home";
 import { Question } from "./Question";
 import { apply, build, judge, pickNext, replay, type Engine } from "../lib/engine";
 import type { Dep, Item, Option, Session, Task, Topic, User } from "../lib/types";
 
 interface PlanRow { id: number; task_id: number; pos: number }
+interface AnswerRow { topic_ord: number; created_at: string }
 
 type Phase =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "home" }
   | { kind: "diagnostic"; task: Task }
-  | { kind: "practice"; task: Task; left: number }
-  | { kind: "feedback"; correct: boolean; left: number }
-  | { kind: "done" };
+  | { kind: "practice"; task: Task; left: number; retry: boolean }
+  | { kind: "verdict"; correct: boolean; again: Task | null; left: number }
+  | { kind: "diagDone" };
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const day = (shift = 0) =>
+  new Date(Date.now() + shift * 86_400_000).toISOString().slice(0, 10);
 
 export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   const t = dict(user.lang);
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
-  const [answered, setAnswered] = useState(0);
-  const [topicsSeen, setTopicsSeen] = useState(0);
-  const [diagDone, setDiagDone] = useState(false);
-  const [plan, setPlan] = useState<PlanRow[]>([]);
-  const [planDone, setPlanDone] = useState(0);
+  const [home, setHome] = useState<HomeData | null>(null);
 
   const engine = useRef<Engine | null>(null);
   const session = useRef<Session | null>(null);
   const items = useRef<Item[]>([]);
-  const tasks = useRef<Map<number, Task>>(new Map());
+  const tasks = useRef<Task[]>([]);
+  const topics = useRef<Map<number, Topic>>(new Map());
   const queue = useRef<PlanRow[]>([]);
+  const extra = useRef<Task[]>([]);
   const shownAt = useRef(0);
   const supervised = useRef(false);
 
   const load = useCallback(async () => {
     setPhase({ kind: "loading" });
     try {
-      const [topics, deps, taskRows, options] = await Promise.all([
+      const [topicRows, deps, taskRows, options] = await Promise.all([
         api.all<Topic>("topics", "select=ord,code,title_ru,title_kk"),
         api.all<Dep>("topic_deps", "select=topic_ord,depends_on"),
         api.all<Task>("tasks", "is_active=is.true&select=id,topic_ord,level,answer_type," +
                                "stem_ru,stem_kk,answer_num,target_seconds"),
         api.all<Option>("options", "select=id,task_id,pos,body,is_correct,error_code")
       ]);
-      if (!topics.length) throw new Error("в базе нет тем — не залит 02_topics.sql");
+      if (!topicRows.length) throw new Error("в базе нет тем — не залит 02_topics.sql");
       if (!taskRows.length) throw new Error("в базе нет задач — не залит 07_bank.sql");
       for (const task of taskRows) {
         task.options = options.filter(o => o.task_id === task.id).sort((a, b) => a.pos - b.pos);
-        tasks.current.set(task.id, task);
       }
+      tasks.current = taskRows;
+      topics.current = new Map(topicRows.map(x => [x.ord, x]));
 
       if (user.group_id !== null) {
         const open = await api.get<{ id: number }>("lessons",
-          `group_id=eq.${user.group_id}&on_date=eq.${todayStr()}&is_open=is.true&select=id`);
+          `group_id=eq.${user.group_id}&on_date=eq.${day()}&is_open=is.true&select=id`);
         supervised.current = open.length > 0;
       }
 
@@ -79,20 +79,47 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
       const saved = await api.all<Item>("diag_items",
         `session_id=eq.${current.id}&select=*&order=pos.asc`);
       items.current = saved;
-      const e = build(topics, deps, taskRows);
+      const e = build(topicRows, deps, taskRows);
       replay(e, saved);
       engine.current = e;
 
-      const planRows = await api.all<PlanRow & { status: string }>("plan_items",
-        `student_id=eq.${user.id}&on_date=eq.${todayStr()}` +
-        `&status=eq.pending&select=id,task_id,pos&order=pos.asc`);
+      const [planRows, answers] = await Promise.all([
+        api.all<PlanRow>("plan_items",
+          `student_id=eq.${user.id}&on_date=eq.${day()}&status=eq.pending` +
+          `&select=id,task_id,pos&order=pos.asc`),
+        api.all<AnswerRow>("answers",
+          `student_id=eq.${user.id}&select=topic_ord,created_at&order=created_at.desc`)
+      ]);
       queue.current = planRows;
 
-      setPlan(planRows);
-      setPlanDone(0);
-      setAnswered(saved.length);
-      setTopicsSeen(new Set(saved.map(i => i.topic_ord)).size);
-      setDiagDone(!pickNext(e));
+      const byId = new Map(taskRows.map(x => [x.id, x]));
+      const planTopics = [...new Set(planRows
+        .map(r => byId.get(r.task_id)?.topic_ord)
+        .filter((x): x is number => x !== undefined))]
+        .map(o => topics.current.get(o))
+        .filter((x): x is Topic => x !== undefined);
+
+      const days = [...new Set(answers.map(a => a.created_at.slice(0, 10)))].sort().reverse();
+      let streak = 0;
+      for (let i = 0; i < days.length; i++) {
+        if (days[i] === day(-i) || (i === 0 && days[0] === day(-1))) streak++;
+        else break;
+      }
+      const passed = [...new Set(answers.map(a => a.topic_ord))]
+        .map(o => topics.current.get(o))
+        .filter((x): x is Topic => x !== undefined)
+        .slice(0, 12);
+
+      setHome({
+        planLeft: planRows.length,
+        planTopics,
+        solvedToday: answers.filter(a => a.created_at.slice(0, 10) === day()).length,
+        solvedYesterday: answers.filter(a => a.created_at.slice(0, 10) === day(-1)).length,
+        streak,
+        passed,
+        diagStarted: saved.length > 0,
+        diagDone: !pickNext(e)
+      });
       setPhase({ kind: "home" });
     } catch (err) {
       setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -111,8 +138,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
         void api.patch("diag_sessions", `id=eq.${s.id}`,
           { status: "done", finished_at: new Date().toISOString() }).catch(() => undefined);
       }
-      setDiagDone(true);
-      setPhase({ kind: "done" });
+      setPhase({ kind: "diagDone" });
       return;
     }
     shownAt.current = performance.now();
@@ -120,12 +146,26 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   }
 
   function nextPractice() {
+    const fromExtra = extra.current.shift();
+    if (fromExtra) {
+      shownAt.current = performance.now();
+      setPhase({ kind: "practice", task: fromExtra, left: extra.current.length, retry: false });
+      return;
+    }
     const row = queue.current[0];
-    if (!row) { setPhase({ kind: "home" }); return; }
-    const task = tasks.current.get(row.task_id);
+    if (!row) { void load(); return; }
+    const task = tasks.current.find(x => x.id === row.task_id);
     if (!task) { queue.current.shift(); nextPractice(); return; }
     shownAt.current = performance.now();
-    setPhase({ kind: "practice", task, left: queue.current.length });
+    setPhase({ kind: "practice", task, left: queue.current.length, retry: false });
+  }
+
+  function openTopic(topic: Topic) {
+    extra.current = tasks.current
+      .filter(x => x.topic_ord === topic.ord)
+      .sort((a, b) => a.level - b.level)
+      .slice(0, 5);
+    nextPractice();
   }
 
   async function answerDiagnostic(task: Task, given: string) {
@@ -148,33 +188,45 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
     items.current.push(row);
     e.used.add(task.id);
     apply(e, task.topic_ord, task.level, verdict.correct, seconds, task.target_seconds, given === "?");
-    setAnswered(items.current.length);
-    setTopicsSeen(new Set(items.current.map(i => i.topic_ord)).size);
     nextDiagnostic();
   }
 
-  async function answerPractice(task: Task, given: string) {
-    const row = queue.current[0];
-    if (!row) return;
+  // Такая же задача, но другая: после ошибки дома даём вторую попытку на том же месте,
+  // а не ответ. Ответ выучивается, попытка — нет.
+  function similar(task: Task, done: Set<number>): Task | null {
+    return tasks.current.find(x =>
+      x.topic_ord === task.topic_ord && x.level === task.level &&
+      x.id !== task.id && !done.has(x.id)) ?? null;
+  }
+
+  async function answerPractice(task: Task, given: string, isRetry: boolean) {
     const seconds = Math.round((performance.now() - shownAt.current) / 1000);
     const verdict = judge(task, given);
+    const fromPlan = !isRetry && queue.current[0]?.task_id === task.id;
     try {
       await api.post("answers", [{
         student_id: user.id, task_id: task.id, topic_ord: task.topic_ord,
-        source: supervised.current ? "lesson" : "home", given,
-        is_correct: verdict.correct, error_code: verdict.code, seconds
+        source: fromPlan ? (supervised.current ? "lesson" : "home") : "extra",
+        given, is_correct: verdict.correct, error_code: verdict.code, seconds
       }]);
-      await api.patch("plan_items", `id=eq.${row.id}`, { status: "done" });
+      if (fromPlan) {
+        const row = queue.current[0];
+        if (row) await api.patch("plan_items", `id=eq.${row.id}`, { status: "done" });
+      }
     } catch (err) {
       setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
       return;
     }
-    queue.current.shift();
-    setPlanDone(n => n + 1);
-    setPlan([...queue.current]);
-    // дома ребёнок один — ему нужна обратная связь. На уроке разбирает учитель.
-    if (supervised.current) nextPractice();
-    else setPhase({ kind: "feedback", correct: verdict.correct, left: queue.current.length });
+    if (fromPlan) queue.current.shift();
+
+    if (supervised.current) { nextPractice(); return; }   // на уроке разбирает учитель
+    const again = verdict.correct || isRetry
+      ? null
+      : similar(task, new Set([task.id]));
+    setPhase({
+      kind: "verdict", correct: verdict.correct, again,
+      left: queue.current.length + extra.current.length
+    });
   }
 
   async function askTeacher(task: Task) {
@@ -186,16 +238,12 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
     } catch { /* не критично */ }
   }
 
-  const bar = (
-    <div className="mb-3 flex items-center gap-3">
-      <span className="flex-1 truncate text-sm text-muted">{user.full_name}</span>
-      <Quiet onClick={onExit}>{t.exit}</Quiet>
-    </div>
-  );
-
   return (
     <div className="mx-auto max-w-xl px-4 py-5">
-      {bar}
+      <div className="mb-3 flex items-center gap-3">
+        <span className="flex-1 truncate text-sm text-muted">{user.full_name}</span>
+        <Quiet onClick={onExit}>{t.exit}</Quiet>
+      </div>
 
       {phase.kind === "loading" && <Card><p className="text-muted">{t.loading}</p></Card>}
 
@@ -207,44 +255,53 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
         </Card>
       )}
 
-      {phase.kind === "home" && (
-        <Home
-          name={user.full_name} lang={user.lang} answered={answered} topics={topicsSeen}
-          done={diagDone} onStart={nextDiagnostic}
-          planLeft={plan.length} planDone={planDone} onPlan={nextPractice}
-        />
+      {phase.kind === "home" && home && (
+        <Home name={user.full_name} lang={user.lang} data={home}
+              onDiag={nextDiagnostic} onPlan={nextPractice} onTopic={openTopic} />
       )}
 
-      {phase.kind === "done" && (
-        <Card><p className="font-read text-lg leading-relaxed">{t.finished}</p></Card>
+      {phase.kind === "diagDone" && (
+        <Card>
+          <p className="font-read text-lg leading-relaxed">{t.finished}</p>
+          <div className="mt-5"><Primary onClick={() => void load()}>{t.done}</Primary></div>
+        </Card>
       )}
 
       {phase.kind === "diagnostic" && (
-        <Question
-          key={`d${phase.task.id}`} task={phase.task} lang={user.lang} number={answered + 1}
-          onAnswer={g => void answerDiagnostic(phase.task, g)}
-          onAsk={() => void askTeacher(phase.task)}
-        />
+        <Question key={`d${phase.task.id}`} task={phase.task} lang={user.lang}
+          onAnswer={g => void answerDiagnostic(phase.task, g)} />
       )}
 
       {phase.kind === "practice" && (
-        <Question
-          key={`p${phase.task.id}`} task={phase.task} lang={user.lang}
-          number={planDone + 1} left={phase.left}
-          onAnswer={g => void answerPractice(phase.task, g)}
-          onAsk={() => void askTeacher(phase.task)}
-        />
+        <Question key={`p${phase.task.id}`} task={phase.task} lang={user.lang}
+          left={phase.left} onAsk={() => void askTeacher(phase.task)}
+          onAnswer={g => void answerPractice(phase.task, g, phase.retry)} />
       )}
 
-      {phase.kind === "feedback" && (
+      {phase.kind === "verdict" && (
         <Card>
           <p className={`font-read text-2xl ${phase.correct ? "text-teal" : "text-red"}`}>
             {phase.correct ? t.right : t.wrong}
           </p>
+          {phase.again && (
+            <p className="mt-2 text-[15px] text-muted">{t.tryAgain}</p>
+          )}
+          {!phase.correct && !phase.again && (
+            <p className="mt-2 text-[15px] text-muted">{t.atLesson}</p>
+          )}
           <div className="mt-5">
-            <Primary onClick={() => (phase.left ? nextPractice() : setPhase({ kind: "home" }))}>
-              {phase.left ? t.next : t.done}
-            </Primary>
+            {phase.again ? (
+              <Primary onClick={() => {
+                const again = phase.again;
+                if (!again) return;
+                shownAt.current = performance.now();
+                setPhase({ kind: "practice", task: again, left: phase.left, retry: true });
+              }}>{t.oneMore}</Primary>
+            ) : (
+              <Primary onClick={() => (phase.left ? nextPractice() : void load())}>
+                {phase.left ? t.next : t.done}
+              </Primary>
+            )}
           </div>
         </Card>
       )}

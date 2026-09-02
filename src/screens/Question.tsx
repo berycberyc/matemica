@@ -5,9 +5,9 @@ import { dict } from "../lib/i18n";
 import type { Lang, Task } from "../lib/types";
 
 export function Question(
-  { task, lang, number, left, onAnswer, onAsk }:
-  { task: Task; lang: Lang; number: number; left?: number;
-    onAnswer: (given: string) => void; onAsk: () => void }
+  { task, lang, left, onAnswer, onAsk }:
+  { task: Task; lang: Lang; left?: number;
+    onAnswer: (given: string) => void; onAsk?: () => void }
 ) {
   const t = dict(lang);
   const [value, setValue] = useState("");
@@ -23,9 +23,11 @@ export function Question(
 
   return (
     <Card className="p-7">
-      <p className="text-[13px] uppercase tracking-[.14em] text-muted/70">
-        {t.question} {number}{left !== undefined ? ` · ${t.left} ${left}` : ""}
-      </p>
+      {left !== undefined && (
+        <p className="text-[13px] uppercase tracking-[.14em] text-muted/70">
+          {t.left} {left}
+        </p>
+      )}
       <p className="mt-3 font-read text-[21px] leading-[1.55]">{stem}</p>
 
       {task.answer_type === "choice" ? (
@@ -56,7 +58,9 @@ export function Question(
 
       <div className="mt-6 flex gap-2">
         <Quiet onClick={() => send("?")}>{t.dontKnow}</Quiet>
-        <Quiet onClick={() => { setAsked(true); onAsk(); }}>{asked ? t.asked : t.ask}</Quiet>
+        {onAsk && (
+          <Quiet onClick={() => { setAsked(true); onAsk(); }}>{asked ? t.asked : t.ask}</Quiet>
+        )}
       </div>
     </Card>
   );
