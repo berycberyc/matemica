@@ -73,11 +73,16 @@ export function Plan() {
         }
       }
 
-      // 2. старый план на те же дни убираем, чтобы не задвоился
+      // 2. загрузка заменяет план на эти дни целиком.
+      // Ответы детей лежат в другой таблице и не трогаются.
       const days = preview?.дни ?? [];
-      for (const day of days) {
-        await api.patch("plan_items", `on_date=eq.${day}&status=eq.pending`,
-          { status: "cancelled" });
+      const ids = file.план
+        .map(p => logins.get(String(p.login)))
+        .filter((x): x is number => x !== undefined);
+      if (ids.length) {
+        for (const day of days) {
+          await api.del("plan_items", `on_date=eq.${day}&student_id=in.(${ids.join(",")})`);
+        }
       }
 
       // 3. новый план

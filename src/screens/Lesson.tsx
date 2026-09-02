@@ -12,7 +12,8 @@ interface Live {
   id: number; имя: string;
   план: number; сделано: number;
   ошибок: number; последняя: string | null;
-  спросил: boolean;
+  спросил: number;
+  ждёт: number;
   диагностика: number;
   начал: boolean;
 }
@@ -57,8 +58,8 @@ export function Lesson() {
           `student_id=${inList}&on_date=eq.${today()}&status=neq.cancelled&select=student_id,status`),
         api.all<{ student_id: number; is_correct: boolean; error_code: string | null; created_at: string }>(
           "answers", `student_id=${inList}&created_at=gte.${today()}&select=student_id,is_correct,error_code,created_at`),
-        api.all<{ student_id: number }>("help_requests",
-          `student_id=${inList}&resolved_at=is.null&select=student_id`),
+        api.all<{ student_id: number; created_at: string }>("help_requests",
+          `student_id=${inList}&resolved_at=is.null&select=student_id,created_at`),
         api.all<{ id: number; student_id: number }>("diag_sessions",
           `student_id=${inList}&select=id,student_id`)
       ]);
@@ -74,7 +75,6 @@ export function Lesson() {
         }
       }
       const names = shortNames(mine);
-      const asked = new Set(help.map(h => h.student_id));
 
       setRows(mine.map(p => {
         const mineAns = answers.filter(a => a.student_id === p.id);
@@ -88,7 +88,10 @@ export function Lesson() {
           сделано: planRows.filter(x => x.status === "done").length,
           ошибок: wrong.length,
           последняя: last?.error_code ?? null,
-          спросил: asked.has(p.id),
+          спросил: help.filter(h => h.student_id === p.id).length,
+          ждёт: help.filter(h => h.student_id === p.id)
+            .reduce((min, h) => Math.min(min, Math.round(
+              (Date.now() - new Date(h.created_at).getTime()) / 60_000)), 999),
           диагностика: diag,
           начал: mineAns.length > 0 || diag > 0
         };
@@ -168,8 +171,10 @@ export function Lesson() {
   const group = groups.find(g => g.id === open.group_id);
   const left = Math.max(0, Math.round(
     (new Date(open.started_at).getTime() + HOURS * 3600_000 - Date.now()) / 60_000));
-  const attention = rows.filter(r => r.спросил || r.ошибок > 0);
-  const quiet = rows.filter(r => !r.спросил && r.ошибок === 0);
+  const order = [...rows].sort((a, b) =>
+    (b.спросил ? 1 : 0) - (a.спросил ? 1 : 0) ||
+    b.ошибок - a.ошибок ||
+    a.имя.localeCompare(b.имя, "ru"));
 
   return (
     <>
@@ -180,44 +185,45 @@ export function Lesson() {
           className="rounded-xl bg-red/10 px-4 py-2.5 text-sm text-red">Закончить</button>
       </div>
 
-      {attention.length === 0 && (
-        <Card className="mb-4"><p className="text-muted">Пока все идут ровно.</p></Card>
-      )}
-
-      <div className="mb-5 grid gap-3 sm:grid-cols-2">
-        {attention.map(r => (
-          <button key={r.id} type="button" onClick={() => r.спросил && void clearHelp(r.id)}
-            className={`rounded-[20px] p-5 text-left transition
-              ${r.спросил ? "bg-amber/15 ring-2 ring-amber" : "bg-red/10 ring-2 ring-red/40"}`}>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-read text-[24px]">{r.имя}</span>
-              <span className="text-sm text-muted">{r.сделано} из {r.план}</span>
-            </div>
-            <p className={`mt-2 text-[15px] ${r.спросил ? "text-amber" : "text-red"}`}>
-              {r.спросил ? "просит подойти" : `ошибок: ${r.ошибок}`}
-            </p>
-            {!r.спросил && r.последняя && (
-              <p className="mt-1 text-sm text-muted">{r.последняя}</p>
-            )}
-          </button>
-        ))}
+      <div className="flex flex-wrap gap-2.5">
+        {order.map(r => <Tile key={r.id} r={r} onClear={() => void clearHelp(r.id)} />)}
       </div>
 
-      <Card>
-        <p className="mb-3 text-sm text-muted">Остальные — {quiet.length}</p>
-        <div className="flex flex-wrap gap-2">
-          {quiet.map(r => (
-            <span key={r.id}
-              className={`rounded-xl px-3 py-2 text-[15px]
-                ${r.начал ? "bg-paper" : "bg-paper text-muted/60"}`}>
-              {r.имя}
-              <span className="ml-2 text-xs text-muted">
-                {r.диагностика > 0 ? `${r.диагностика} отв.` : r.план ? `${r.сделано}/${r.план}` : "—"}
-              </span>
-            </span>
-          ))}
-        </div>
-      </Card>
+      <p className="mt-5 text-sm text-muted">
+        Синим — кто просит подойти, нажми, когда подошёл. Чем темнее плитка, тем больше ошибок.
+      </p>
     </>
+  );
+}
+
+// Ошибки показываем не цветом тревоги, а густотой: одна ошибка — ещё не беда,
+// три подряд — уже видно с другого конца стола.
+const SHADES = ["bg-paper", "bg-[#EFE6E2]", "bg-[#E3D2CA]", "bg-[#D5BCB1]"];
+
+function Tile({ r, onClear }: { r: Live; onClear: () => void }) {
+  if (r.спросил) {
+    return (
+      <button type="button" onClick={onClear}
+        className="rounded-2xl bg-[#2F6FA8] px-4 py-3 text-left text-white transition active:scale-95">
+        <div className="font-read text-[19px]">{r.имя}</div>
+        <div className="text-[13px] text-white/75">
+          просит подойти{r.спросил > 1 ? ` · ${r.спросил} раза` : ""}
+          {r.ждёт < 999 ? ` · ${r.ждёт} мин` : ""}
+        </div>
+      </button>
+    );
+  }
+  const shade = SHADES[Math.min(r.ошибок, SHADES.length - 1)] ?? "bg-paper";
+  return (
+    <div className={`rounded-2xl px-4 py-3 ${shade} ${r.начал ? "" : "opacity-50"}`}>
+      <div className="font-read text-[19px]">{r.имя}</div>
+      <div className="text-[13px] text-muted">
+        {r.ошибок > 0
+          ? `${r.ошибок} ${r.ошибок === 1 ? "ошибка" : "ошибок"}`
+          : r.диагностика > 0 ? `${r.диагностика} отв.`
+          : r.план ? `${r.сделано} из ${r.план}`
+          : r.начал ? "идёт" : "не начал"}
+      </div>
+    </div>
   );
 }
