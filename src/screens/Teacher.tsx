@@ -94,7 +94,7 @@ export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
           .filter(s => s.group_id === g.id)
           .sort((a, b) => a.full_name.localeCompare(b.full_name, "ru"));
         return (
-          <Card key={g.id} className={`mb-4 ${open ? "border-teal border-2" : ""}`}>
+          <Card key={g.id} className={`mb-4 ${open ? "ring-2 ring-teal" : ""}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-xl">Группа {g.name}</h2>
               <div className="w-56">
@@ -113,7 +113,7 @@ export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
                 const n = board.answered.get(s.id) ?? 0;
                 return (
                   <div key={s.id}
-                    className={`flex justify-between gap-3 border-b border-line/60 py-2 text-[15px]
+                    className={`flex justify-between gap-3 border-b border-paper py-2.5 text-[15px]
                                 ${board.asked.has(s.id) ? "bg-[#FFF6E6]" : ""}`}>
                     <span className="truncate">{s.full_name}</span>
                     <span className="whitespace-nowrap text-sm text-muted">

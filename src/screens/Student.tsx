@@ -3,12 +3,14 @@ import { api } from "../lib/api";
 import { dict } from "../lib/i18n";
 import { Keypad } from "../components/Keypad";
 import { Card, Primary, Quiet, Tech } from "../components/Ui";
+import { Home } from "./Home";
 import { apply, build, judge, pickNext, replay, type Engine } from "../lib/engine";
 import type { Dep, Item, Option, Session, Task, Topic, User } from "../lib/types";
 
 type Phase =
   | { kind: "loading" }
   | { kind: "error"; message: string }
+  | { kind: "home"; answered: number; topics: number; done: boolean }
   | { kind: "question"; task: Task }
   | { kind: "done" };
 
@@ -85,7 +87,8 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
       replay(e, saved);
       engine.current = e;
       setAsked(saved.length);
-      await advance();
+      const seen = new Set(saved.map(i => i.topic_ord));
+      setPhase({ kind: "home", answered: saved.length, topics: seen.size, done: !pickNext(e) });
     } catch (err) {
       setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
     }
@@ -127,8 +130,13 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-4">
-      <TopBar name={user.full_name} exitLabel={t.exit} sureLabel={t.sure} onExit={onExit} />
+    <div className="mx-auto max-w-xl px-4 py-5">
+      {phase.kind !== "home" &&
+        <TopBar name={user.full_name} exitLabel={t.exit} sureLabel={t.sure} onExit={onExit} />}
+      {phase.kind === "home" &&
+        <div className="mb-2 flex justify-end">
+          <Quiet onClick={onExit}>{t.exit}</Quiet>
+        </div>}
 
       {phase.kind === "loading" && <Card><p className="text-muted">{t.loading}</p></Card>}
 
@@ -142,6 +150,13 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
 
       {phase.kind === "done" && (
         <Card><p className="font-read text-lg leading-relaxed">{t.finished}</p></Card>
+      )}
+
+      {phase.kind === "home" && (
+        <Home
+          name={user.full_name} lang={user.lang} answered={phase.answered}
+          topics={phase.topics} done={phase.done} onStart={() => void advance()}
+        />
       )}
 
       {phase.kind === "question" && (
@@ -188,24 +203,25 @@ function Question(
   }
 
   return (
-    <Card>
-      <p className="text-sm text-muted">{t.question} {number}</p>
-      <p className="mt-2 font-read text-[19px] leading-relaxed">{stem}</p>
+    <Card className="p-7">
+      <p className="text-[13px] uppercase tracking-[.14em] text-muted/70">{t.question} {number}</p>
+      <p className="mt-3 font-read text-[21px] leading-[1.55]">{stem}</p>
 
       {task.answer_type === "choice" ? (
         <div className="mt-5 space-y-2">
           {task.options.map(o => (
             <button
               key={o.id} type="button" disabled={sent} onClick={() => send(o.body)}
-              className="w-full rounded-xl border border-line bg-white py-4 text-xl
-                         active:border-teal active:bg-teal-light disabled:opacity-40"
+              className="w-full rounded-2xl bg-paper py-4 font-read text-[22px]
+                         transition active:scale-[.99] active:bg-teal-light
+                         disabled:opacity-40"
             >{o.body}</button>
           ))}
         </div>
       ) : (
         <div className="mt-5">
-          <div className="mb-3 min-h-[58px] rounded-xl border border-line bg-[#FBFCFB]
-                          px-4 py-3 text-2xl tracking-wide break-all">
+          <div className="mb-4 min-h-[62px] rounded-2xl bg-paper px-5 py-4
+                          font-read text-[26px] tracking-wide break-all">
             {value || <span className="text-base text-line">{t.typeAnswer}</span>}
           </div>
           <Keypad onKey={k => {
@@ -218,7 +234,7 @@ function Question(
         </div>
       )}
 
-      <div className="mt-4 flex gap-2">
+      <div className="mt-6 flex gap-2">
         <Quiet onClick={() => send("?")}>{t.dontKnow}</Quiet>
         <Quiet onClick={() => { setAskedTeacher(true); onAsk(); }}>
           {askedTeacher ? t.asked : t.ask}

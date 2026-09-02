@@ -68,7 +68,7 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
       </div>
 
       <div className="md:pt-16">
-        <div className="rounded-2xl border border-line bg-white p-7">
+        <div className="rounded-[20px] bg-white p-7 shadow-[0_1px_2px_rgba(20,48,46,.06)]">
           <h2 className="text-lg">Sign in</h2>
           <p className="mt-1 text-sm text-muted">Digits only, both fields.</p>
 
@@ -76,8 +76,8 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
           <input
             id="login" inputMode="numeric" autoComplete="off" autoCapitalize="off"
             value={login} onChange={e => setLogin(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-line px-4 py-3 text-lg
-                       focus:border-teal focus:outline-none"
+            className="mt-1 w-full rounded-xl bg-paper px-4 py-3 text-lg outline-none
+                       focus:ring-2 focus:ring-teal"
           />
 
           <label className="mt-4 block text-sm text-muted" htmlFor="code">Code</label>
@@ -85,8 +85,8 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
             id="code" inputMode="numeric" type={show ? "text" : "password"} autoComplete="off"
             value={pass} onChange={e => setPass(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") void submit(); }}
-            className="mt-1 w-full rounded-xl border border-line px-4 py-3 text-lg
-                       focus:border-teal focus:outline-none"
+            className="mt-1 w-full rounded-xl bg-paper px-4 py-3 text-lg outline-none
+                       focus:ring-2 focus:ring-teal"
           />
           <button
             type="button" onClick={() => setShow(v => !v)}
@@ -95,8 +95,8 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
 
           <button
             type="button" onClick={() => void submit()} disabled={busy}
-            className="mt-5 w-full rounded-xl bg-teal px-4 py-4 text-white
-                       active:bg-teal-dark disabled:opacity-50"
+            className="mt-6 w-full rounded-2xl bg-teal px-4 py-4 text-[17px] text-white
+                       transition active:scale-[.99] active:bg-teal-dark disabled:opacity-50"
           >{busy ? "…" : "Sign in"}</button>
 
           {error && <p className="mt-3 text-sm text-red">{error}</p>}
