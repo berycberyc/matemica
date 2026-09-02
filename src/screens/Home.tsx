@@ -20,8 +20,9 @@ const TEXT = {
 } as const;
 
 export function Home(
-  { name, lang, answered, topics, done, onStart }:
-  { name: string; lang: Lang; answered: number; topics: number; done: boolean; onStart: () => void }
+  { name, lang, answered, topics, done, onStart, planLeft, planDone, onPlan }:
+  { name: string; lang: Lang; answered: number; topics: number; done: boolean;
+    onStart: () => void; planLeft: number; planDone: number; onPlan: () => void }
 ) {
   const t = TEXT[lang];
   const first = answered === 0;
@@ -43,6 +44,30 @@ export function Home(
           </button>
         )}
       </div>
+
+      {(planLeft > 0 || planDone > 0) && (
+        <div className="mt-4 rounded-[20px] bg-white p-6">
+          <p className="text-[13px] uppercase tracking-[.14em] text-muted/70">
+            {lang === "kk" ? "Бүгінгі есептер" : "Задачи на сегодня"}
+          </p>
+          {planLeft > 0 ? (
+            <>
+              <p className="mt-3 font-read text-[19px]">
+                {planLeft}{lang === "kk" ? " есеп қалды" : " задач осталось"}
+              </p>
+              <button type="button" onClick={onPlan}
+                className="mt-5 w-full rounded-2xl bg-teal px-5 py-4 text-[17px] text-white
+                           transition active:scale-[.99]">
+                {lang === "kk" ? "Бастау" : "Начать"}
+              </button>
+            </>
+          ) : (
+            <p className="mt-3 font-read text-[19px] text-teal">
+              {lang === "kk" ? "Бүгінге бәрі бітті" : "На сегодня всё"}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Stat value={answered} label={t.solved} />

@@ -4,6 +4,8 @@ import { Card, Primary, Quiet, Tech } from "../components/Ui";
 import { parsePlan, type PlanFile, type Preview } from "../lib/plan";
 import type { User } from "../lib/types";
 
+interface Row { student_id: number; on_date: string; status: string }
+
 export function Plan() {
   const [logins, setLogins] = useState<Map<string, number>>(new Map());
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -11,12 +13,22 @@ export function Plan() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [names, setNames] = useState<Map<number, string>>(new Map());
+  const [day, setDay] = useState<string>("");
   const input = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
-      const rows = await api.all<User>("users", "role=eq.student&select=id,login,is_active");
-      setLogins(new Map(rows.filter(r => r.is_active).map(r => [String(r.login), r.id])));
+      const people = await api.all<User>("users", "role=eq.student&select=id,full_name,login,is_active");
+      setLogins(new Map(people.filter(r => r.is_active).map(r => [String(r.login), r.id])));
+      setNames(new Map(people.map(r => [r.id, r.full_name])));
+      const items = await api.all<Row>("plan_items",
+        "status=neq.cancelled&select=student_id,on_date,status&order=on_date.asc");
+      setRows(items);
+      const days = [...new Set(items.map(i => i.on_date))].sort();
+      const todayStr = new Date().toISOString().slice(0, 10);
+      setDay(days.find(d => d >= todayStr) ?? days[days.length - 1] ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -88,6 +100,7 @@ export function Plan() {
         }
       }
       setDone(`Записано: ${file.задачи.length} задач и ${written} назначений.`);
+      await load();
       setPreview(null);
       setFile(null);
       if (input.current) input.current.value = "";
@@ -97,7 +110,18 @@ export function Plan() {
     setBusy(false);
   }
 
+  const days = [...new Set(rows.map(r => r.on_date))].sort();
+  const shown = rows.filter(r => r.on_date === day);
+  const byStudent = new Map<number, { всего: number; сделано: number }>();
+  for (const r of shown) {
+    const cur = byStudent.get(r.student_id) ?? { всего: 0, сделано: 0 };
+    cur.всего++;
+    if (r.status === "done") cur.сделано++;
+    byStudent.set(r.student_id, cur);
+  }
+
   return (
+    <>
     <Card>
       <h3 className="text-lg">Загрузить план на неделю</h3>
       <p className="mt-1 text-sm text-muted">
@@ -147,5 +171,41 @@ export function Plan() {
         </div>
       )}
     </Card>
+
+    <Card className="mt-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="flex-1 text-lg">Что назначено</h3>
+        {days.map(d => (
+          <button key={d} type="button" onClick={() => setDay(d)}
+            className={`rounded-xl px-3 py-2 text-sm transition
+              ${d === day ? "bg-teal text-white" : "bg-paper text-muted hover:text-teal"}`}>
+            {d.slice(8)}.{d.slice(5, 7)}
+          </button>
+        ))}
+      </div>
+
+      {!days.length && <p className="mt-3 text-muted">Плана пока нет.</p>}
+
+      {days.length > 0 && (
+        <>
+          <p className="mt-3 text-sm text-muted">
+            {byStudent.size} учеников, {shown.length} задач на этот день
+          </p>
+          <div className="mt-3 grid gap-x-8 sm:grid-cols-2">
+            {[...byStudent.entries()]
+              .sort((a, b) => (names.get(a[0]) ?? "").localeCompare(names.get(b[0]) ?? "", "ru"))
+              .map(([id, c]) => (
+                <div key={id} className="flex justify-between gap-3 border-b border-paper py-2.5 text-[15px]">
+                  <span className="truncate">{names.get(id) ?? id}</span>
+                  <span className="whitespace-nowrap text-sm text-muted">
+                    {c.сделано} из {c.всего}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
+    </Card>
+    </>
   );
 }
