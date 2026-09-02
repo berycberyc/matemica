@@ -99,7 +99,19 @@ export function Plan() {
           written += rows.length;
         }
       }
-      setDone(`Записано: ${file.задачи.length} задач и ${written} назначений.`);
+      // 4. заключения
+      let notes = 0;
+      for (const n of file.заключения ?? []) {
+        const sid = logins.get(String(n.login));
+        if (sid === undefined) continue;
+        await api.patch("ai_notes", `student_id=eq.${sid}&week_start=eq.${file.неделя}`,
+          { body: n.текст }).catch(() => undefined);
+        await api.post("ai_notes",
+          [{ student_id: sid, week_start: file.неделя, body: n.текст }]).catch(() => undefined);
+        notes++;
+      }
+
+      setDone(`Записано: ${file.задачи.length} задач, ${written} назначений, ${notes} заключений.`);
       await load();
       setPreview(null);
       setFile(null);
@@ -143,7 +155,7 @@ export function Plan() {
           <p className="text-[15px]">
             Неделя с {preview.неделя}. Дней: {preview.дни.length}.
             Новых задач: {preview.новыхЗадач}. Учеников: {preview.учеников}.
-            Всего назначений: {preview.назначений}.
+            Всего назначений: {preview.назначений}. Заключений: {preview.заключений}.
           </p>
           {preview.неизвестныеЛогины.length > 0 && (
             <p className="mt-2 text-sm text-amber">

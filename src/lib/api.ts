@@ -37,5 +37,8 @@ export const api = {
   },
   patch<T>(table: string, query: string, body: unknown): Promise<T[]> {
     return call<T[]>(`${table}?${query}`, { method: "PATCH", body: JSON.stringify(body) });
+  },
+  del(table: string, query: string): Promise<unknown[]> {
+    return call<unknown[]>(`${table}?${query}`, { method: "DELETE" });
   }
 };

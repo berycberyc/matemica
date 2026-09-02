@@ -1,79 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { Card, Quiet, Tech } from "../components/Ui";
 import { api } from "../lib/api";
-import { Card, Primary, Quiet, Tech } from "../components/Ui";
-import { Students } from "./Students";
+import { Lesson } from "./Lesson";
+import { Notes } from "./Notes";
 import { Plan } from "./Plan";
-import type { Group, Item, Lesson, Session, User } from "../lib/types";
+import { Students } from "./Students";
+import type { Item, User } from "../lib/types";
 
-const WINDOW_HOURS = 2;
+type TabName = "lesson" | "notes" | "plan" | "people";
 const today = () => new Date().toISOString().slice(0, 10);
 
-interface Board {
-  groups: Group[]; lessons: Lesson[]; students: User[];
-  answered: Map<number, number>; asked: Set<number>;
-}
-
 export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
-  const [tab, setTab] = useState<Tab>("today");
-  const [board, setBoard] = useState<Board | null>(null);
+  const [tab, setTab] = useState<TabName>("lesson");
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const stale = await api.get<Lesson>("lessons", "is_open=is.true&select=id,started_at");
-      const limit = Date.now() - WINDOW_HOURS * 3600_000;
-      for (const l of stale) {
-        if (new Date(l.started_at).getTime() < limit) {
-          await api.patch("lessons", `id=eq.${l.id}`,
-            { is_open: false, ended_at: new Date().toISOString() });
-        }
-      }
-      const [groups, lessons, students, sessions, rows, help] = await Promise.all([
-        api.all<Group>("groups", "is_active=is.true&select=id,name&order=name.asc"),
-        api.all<Lesson>("lessons", `on_date=eq.${today()}&select=*`),
-        api.all<User>("users", "role=eq.student&is_active=is.true&select=*"),
-        api.all<Session>("diag_sessions", "select=id,student_id"),
-        api.all<Pick<Item, "session_id">>("diag_items", "select=session_id"),
-        api.all<{ student_id: number }>("help_requests", "resolved_at=is.null&select=student_id")
-      ]);
-      const owner = new Map(sessions.map(s => [s.id, s.student_id]));
-      const answered = new Map<number, number>();
-      for (const r of rows) {
-        const sid = owner.get(r.session_id);
-        if (sid !== undefined) answered.set(sid, (answered.get(sid) ?? 0) + 1);
-      }
-      setBoard({ groups, lessons, students, answered, asked: new Set(help.map(h => h.student_id)) });
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-    const id = setInterval(() => void load(), 20_000);
-    return () => clearInterval(id);
-  }, [load]);
-
-  async function toggle(group: Group, lesson: Lesson | undefined) {
-    setSaving(true);
-    try {
-      if (lesson && lesson.is_open) {
-        await api.patch("lessons", `id=eq.${lesson.id}`,
-          { is_open: false, ended_at: new Date().toISOString() });
-      } else if (lesson) {
-        await api.patch("lessons", `id=eq.${lesson.id}`,
-          { is_open: true, started_at: new Date().toISOString(), ended_at: null });
-      } else {
-        await api.post("lessons", [{ group_id: group.id, on_date: today(), is_open: true }]);
-      }
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-    setSaving(false);
-  }
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-6">
@@ -83,63 +22,34 @@ export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
         <Quiet onClick={onExit}>Выйти</Quiet>
       </div>
 
-      <div className="mb-5 flex gap-2">
-        <Tab now={tab} me="today" set={setTab}>Сегодня</Tab>
-        <Tab now={tab} me="people" set={setTab}>Ученики</Tab>
+      <div className="mb-5 flex flex-wrap gap-2">
+        <Tab now={tab} me="lesson" set={setTab}>Урок</Tab>
+        <Tab now={tab} me="notes" set={setTab}>Заключения</Tab>
         <Tab now={tab} me="plan" set={setTab}>План</Tab>
+        <Tab now={tab} me="people" set={setTab}>Ученики</Tab>
       </div>
 
-      {tab === "people" && <Students />}
+      {error && <Card className="mb-4"><p>Не вышло.</p><Tech>{error}</Tech></Card>}
+
+      {tab === "lesson" && <Lesson />}
+      {tab === "notes" && <Notes />}
       {tab === "plan" && <Plan />}
-
-      {tab === "today" && error && <Card className="mb-4"><p>Не вышло.</p><Tech>{error}</Tech></Card>}
-      {tab === "today" && !board && !error && <Card><p className="text-muted">Секунду…</p></Card>}
-
-      {tab === "today" && board?.groups.map(g => {
-        const lesson = board.lessons.find(l => l.group_id === g.id);
-        const open = lesson?.is_open === true;
-        const left = lesson
-          ? Math.max(0, Math.round(
-              (new Date(lesson.started_at).getTime() + WINDOW_HOURS * 3600_000 - Date.now()) / 60_000))
-          : 0;
-        const list = board.students
-          .filter(s => s.group_id === g.id)
-          .sort((a, b) => a.full_name.localeCompare(b.full_name, "ru"));
-        return (
-          <Card key={g.id} className={`mb-4 ${open ? "ring-2 ring-teal" : ""}`}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl">Группа {g.name}</h2>
-              <div className="w-56">
-                <Primary disabled={saving} onClick={() => void toggle(g, lesson)}>
-                  {open ? "Закончить диагностику" : "Начать диагностику"}
-                </Primary>
-              </div>
-            </div>
-            <p className="mt-2 text-sm text-muted">
-              {open
-                ? `Окно открыто, ответы помечаются «при учителе». Закроется само через ${left} мин.`
-                : "Окно закрыто. Ответы будут помечены «дома»."}
-            </p>
-            <div className="mt-4 grid gap-x-8 sm:grid-cols-2">
-              {list.map(s => {
-                const n = board.answered.get(s.id) ?? 0;
-                return (
-                  <div key={s.id}
-                    className={`flex justify-between gap-3 border-b border-paper py-2.5 text-[15px]
-                                ${board.asked.has(s.id) ? "bg-[#FFF6E6]" : ""}`}>
-                    <span className="truncate">{s.full_name}</span>
-                    <span className="whitespace-nowrap text-sm text-muted">
-                      {board.asked.has(s.id) && <span className="mr-2 text-amber">спрашивает</span>}
-                      {n ? `${n} отв.` : "не начал"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        );
-      })}
+      {tab === "people" && <Students />}
     </div>
+  );
+}
+
+function Tab(
+  { now, me, set, children }:
+  { now: TabName; me: TabName; set: (v: TabName) => void; children: string }
+) {
+  const on = now === me;
+  return (
+    <button type="button" onClick={() => set(me)}
+      className={`rounded-xl px-4 py-2 text-[15px] transition
+        ${on ? "bg-teal text-white" : "bg-white text-muted hover:text-teal"}`}>
+      {children}
+    </button>
   );
 }
 
@@ -190,17 +100,3 @@ function Export({ onError }: { onError: (m: string) => void }) {
 }
 
 type Tab = "today" | "people" | "plan";
-
-function Tab(
-  { now, me, set, children }:
-  { now: string; me: Tab; set: (v: Tab) => void; children: string }
-) {
-  const on = now === me;
-  return (
-    <button type="button" onClick={() => set(me)}
-      className={`rounded-xl px-4 py-2 text-[15px] transition
-        ${on ? "bg-teal text-white" : "bg-white text-muted hover:text-teal"}`}>
-      {children}
-    </button>
-  );
-}

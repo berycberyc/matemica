@@ -15,6 +15,7 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [teacherMode, setTeacherMode] = useState(false);
 
   async function submit() {
     setBusy(true);
@@ -70,11 +71,16 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
       <div className="md:pt-16">
         <div className="rounded-[20px] bg-white p-7 shadow-[0_1px_2px_rgba(20,48,46,.06)]">
           <h2 className="text-lg">Sign in</h2>
-          <p className="mt-1 text-sm text-muted">Digits only, both fields.</p>
+          <p className="mt-1 text-sm text-muted">
+            {teacherMode ? "Letters and digits." : "Digits only, both fields."}
+          </p>
 
-          <label className="mt-6 block text-sm text-muted" htmlFor="login">Number</label>
+          <label className="mt-6 block text-sm text-muted" htmlFor="login">
+            {teacherMode ? "Login" : "Number"}
+          </label>
           <input
-            id="login" inputMode="numeric" autoComplete="off" autoCapitalize="off"
+            id="login" inputMode={teacherMode ? "text" : "numeric"}
+            autoComplete="off" autoCapitalize="off"
             value={login} onChange={e => setLogin(e.target.value)}
             className="mt-1 w-full rounded-xl bg-paper px-4 py-3 text-lg outline-none
                        focus:ring-2 focus:ring-teal"
@@ -82,7 +88,8 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
 
           <label className="mt-4 block text-sm text-muted" htmlFor="code">Code</label>
           <input
-            id="code" inputMode="numeric" type={show ? "text" : "password"} autoComplete="off"
+            id="code" inputMode={teacherMode ? "text" : "numeric"}
+            type={show ? "text" : "password"} autoComplete="off" autoCapitalize="off"
             value={pass} onChange={e => setPass(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") void submit(); }}
             className="mt-1 w-full rounded-xl bg-paper px-4 py-3 text-lg outline-none
@@ -100,6 +107,11 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
           >{busy ? "…" : "Sign in"}</button>
 
           {error && <p className="mt-3 text-sm text-red">{error}</p>}
+
+          <button type="button" onClick={() => setTeacherMode(v => !v)}
+            className="mt-5 block text-sm text-muted underline-offset-2 hover:underline">
+            {teacherMode ? "I'm a student" : "I'm a teacher"}
+          </button>
         </div>
       </div>
     </div>

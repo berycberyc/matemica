@@ -16,11 +16,14 @@ export interface PlanTask {
 export interface PlanDay { дата: string; задачи: (string | number)[] }
 export interface PlanStudent { login: string; дни: PlanDay[] }
 
+export interface Note { login: string; текст: string }
+
 export interface PlanFile {
   вид: "план";
   неделя: string;
   задачи: PlanTask[];
   план: PlanStudent[];
+  заключения?: Note[];
 }
 
 export interface Preview {
@@ -30,6 +33,7 @@ export interface Preview {
   новыхЗадач: number;
   учеников: number;
   назначений: number;
+  заключений: number;
   дни: string[];
   неизвестныеЛогины: string[];
 }
@@ -40,7 +44,7 @@ export function parsePlan(raw: unknown, knownLogins: Set<string>): Preview & { f
   const problems: string[] = [];
   const empty: Preview = {
     ok: false, problems, неделя: "", новыхЗадач: 0, учеников: 0,
-    назначений: 0, дни: [], неизвестныеЛогины: []
+    назначений: 0, заключений: 0, дни: [], неизвестныеЛогины: []
   };
   if (typeof raw !== "object" || raw === null) {
     problems.push("Файл не читается как план.");
@@ -90,6 +94,17 @@ export function parsePlan(raw: unknown, knownLogins: Set<string>): Preview & { f
     }
   }
 
+  for (const n of f.заключения ?? []) {
+    if (!knownLogins.has(String(n.login))) unknown.add(String(n.login));
+    if (!n.текст?.trim()) problems.push(`Пустое заключение у ${n.login}.`);
+  }
+
+  const notes = Array.isArray(f.заключения) ? f.заключения : [];
+  for (const n of notes) {
+    if (!knownLogins.has(String(n.login))) unknown.add(String(n.login));
+    if (!n.текст?.trim()) problems.push(`Пустое заключение для ${n.login}.`);
+  }
+
   return {
     ok: problems.length === 0,
     problems,
@@ -97,6 +112,7 @@ export function parsePlan(raw: unknown, knownLogins: Set<string>): Preview & { f
     новыхЗадач: tasks.length,
     учеников: plan.length,
     назначений: assignments,
+    заключений: (f.заключения ?? []).length,
     дни: [...days].sort(),
     неизвестныеЛогины: [...unknown],
     file: f as PlanFile

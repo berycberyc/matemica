@@ -73,6 +73,11 @@ export function Students() {
     await load();
   }
 
+  async function moveTo(u: User, groupId: number) {
+    await api.patch("users", `id=eq.${u.id}`, { group_id: groupId });
+    await load();
+  }
+
   async function resetCode(u: User) {
     const code = newCode(taken);
     await api.patch("users", `id=eq.${u.id}`, { password: code });
@@ -127,8 +132,14 @@ export function Students() {
                 <span className={`flex-1 ${p.is_active ? "" : "text-muted line-through"}`}>
                   {p.full_name}
                 </span>
+                <select
+                  value={p.group_id ?? ""}
+                  onChange={e => void moveTo(p, Number(e.target.value))}
+                  className="rounded-lg bg-paper px-2 py-1.5 text-sm outline-none
+                             focus:ring-2 focus:ring-teal">
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
                 <span className="text-sm text-muted">
-                  {groups.find(g => g.id === p.group_id)?.name ?? "без группы"} ·{" "}
                   {p.lang === "kk" ? "каз" : "рус"} · {p.login}
                 </span>
                 {shownCode?.id === p.id && (
