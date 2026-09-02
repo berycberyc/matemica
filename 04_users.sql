@@ -1,0 +1,76 @@
+-- ============================================================
+--  matemica — 62 ученика. Запускать после 01_schema.sql.
+--  Логин — прежний номер zipgrade, пароль новый, четыре цифры.
+-- ============================================================
+
+delete from users where role = 'student';
+
+insert into users (role, full_name, login, password, lang, group_id, grade, note) values
+  ('student', 'Абдусаттар Алихан', '47448', '1697', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Бакберген Динмухаммед', '53449', '8317', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 1'),
+  ('student', 'Батыр Марғұлан', '92475', '1018', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Батыр Хансұлтан', '48452', '1926', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Бақытбек Даниял', '13872', '9981', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Ерназар Алуа', '58845', '3840', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 1'),
+  ('student', 'Жәнібек Мұқағали', '78538', '4483', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 3'),
+  ('student', 'Закиров Абидбек', '89041', '7333', 'ru', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Кульжанисова Амина', '21025', '5429', 'ru', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Нуриддин Нұрдос', '57497', '3403', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Нұрдула Айару', '30545', '9361', 'ru', (select id from groups where name = '08:00'), 6, 'схватывает: 1'),
+  ('student', 'Нұрманғали Шыңғыс', '87551', '2755', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Оразбек Едіге', '22233', '5955', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 1'),
+  ('student', 'Пердебай Асанғали', '12288', '9150', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Райимжан Чинара', '38043', '7897', 'ru', (select id from groups where name = '08:00'), 6, 'схватывает: 1'),
+  ('student', 'Рамаш Сағадат', '88888', '1772', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Серікбай Алинұр', '95069', '9255', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 1'),
+  ('student', 'Тасмаханбет Ажар', '96088', '7383', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Әшір Асылмұрат', '28832', '2892', 'kk', (select id from groups where name = '08:00'), 6, 'схватывает: 2'),
+  ('student', 'Асқар Алихан', '63682', '1657', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Байдулла Ұлбосын', '59687', '4972', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Баходиров Амир', '88576', '1144', 'ru', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Бақберген Нұртас', '93700', '5598', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Бақытжан Айару', '54298', '2953', 'ru', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Джұмабек Арнұр', '64890', '6082', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Есенбек Қазына', '38259', '8397', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Марат Жания', '56386', '2821', 'ru', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Маханбет Алдияр', '22587', '4479', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Мусамат Әділет', '30988', '2815', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Мұрат Әліпбек', '62279', '7350', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Мәлік Ибрахим', '11542', '8445', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Сеитхан Алкен', '23683', '7428', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Серік Алинур', '51971', '9248', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Тулеген Данеля', '29414', '8480', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Турлыби Ажар', '67797', '4135', 'ru', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Төлеген Айдар', '99459', '7139', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Төлепберген Айқын', '95122', '3989', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Халдан Нұралы', '83261', '5655', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Хасан Әлия', '99559', '6766', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 1'),
+  ('student', 'Құрманбек Иманғали', '11493', '6863', 'ru', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Үсейін Айсұлтан', '17490', '3059', 'ru', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Әмір Абылай', '69388', '9105', 'kk', (select id from groups where name = '10:30'), 6, 'схватывает: 2'),
+  ('student', 'Абибулла Сұлтан', '65855', '1164', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Алайдар Айбын', '84146', '9370', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Амантай Көркем', '65804', '8124', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Асылхан Нурислам', '11904', '5663', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Балтабай Марғұлан', '18804', '2223', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Батырхан Арсен', '79147', '3690', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Бейбіт Айжан', '62420', '8837', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Бекжігіт Әбдіманап', '38608', '5626', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Есенғали Ерсұлтан', '84980', '9415', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Жақсылық Бекзат', '23756', '8447', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Илесбек Асима', '35294', '9609', 'ru', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Инкижино Чингиз', '39703', '1357', 'ru', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Керімхан Асылжан', '60481', '2038', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Оразбай Әлинұр', '47102', '2805', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Садиков Нурислам', '35476', '5444', 'ru', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Төрекелді Тәуекел', '73966', '7885', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Чапай Шынасыл', '28996', '6877', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Қазыхан Раяна', '40818', '2350', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 1'),
+  ('student', 'Қыдырбай Нұрислам', '46247', '7991', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2'),
+  ('student', 'Әшірбек Арсен', '69496', '4557', 'kk', (select id from groups where name = '15:00'), 6, 'схватывает: 2');
+
+-- отчёт
+select g.name as группа, count(*) as учеников,
+       count(*) filter (where u.lang = 'kk') as казахских
+  from users u join groups g on g.id = u.group_id
+ where u.role = 'student' group by g.name order by g.name;
