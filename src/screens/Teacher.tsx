@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { Card, Primary, Quiet, Tech } from "../components/Ui";
+import { Students } from "./Students";
 import type { Group, Item, Lesson, Session, User } from "../lib/types";
 
 const WINDOW_HOURS = 2;
@@ -12,6 +13,7 @@ interface Board {
 }
 
 export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
+  const [tab, setTab] = useState<"today" | "people">("today");
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -80,10 +82,17 @@ export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
         <Quiet onClick={onExit}>Выйти</Quiet>
       </div>
 
-      {error && <Card className="mb-4"><p>Не вышло.</p><Tech>{error}</Tech></Card>}
-      {!board && !error && <Card><p className="text-muted">Секунду…</p></Card>}
+      <div className="mb-5 flex gap-2">
+        <Tab now={tab} me="today" set={setTab}>Сегодня</Tab>
+        <Tab now={tab} me="people" set={setTab}>Ученики</Tab>
+      </div>
 
-      {board?.groups.map(g => {
+      {tab === "people" && <Students />}
+
+      {tab === "today" && error && <Card className="mb-4"><p>Не вышло.</p><Tech>{error}</Tech></Card>}
+      {tab === "today" && !board && !error && <Card><p className="text-muted">Секунду…</p></Card>}
+
+      {tab === "today" && board?.groups.map(g => {
         const lesson = board.lessons.find(l => l.group_id === g.id);
         const open = lesson?.is_open === true;
         const left = lesson
@@ -175,4 +184,18 @@ function Export({ onError }: { onError: (m: string) => void }) {
   }
 
   return <Quiet onClick={() => { if (!busy) void run(); }}>{label}</Quiet>;
+}
+
+function Tab(
+  { now, me, set, children }:
+  { now: string; me: "today" | "people"; set: (v: "today" | "people") => void; children: string }
+) {
+  const on = now === me;
+  return (
+    <button type="button" onClick={() => set(me)}
+      className={`rounded-xl px-4 py-2 text-[15px] transition
+        ${on ? "bg-teal text-white" : "bg-white text-muted hover:text-teal"}`}>
+      {children}
+    </button>
+  );
 }
