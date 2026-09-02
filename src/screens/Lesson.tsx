@@ -1,12 +1,13 @@
 // Экран урока. Наверху те, к кому надо подойти. Остальные — тихо внизу.
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { day } from "../lib/day";
 import { Card, Tech } from "../components/Ui";
 import { shortNames } from "../lib/names";
 import type { Group, Lesson as LessonRow, User } from "../lib/types";
 
 const HOURS = 2;
-const today = () => new Date().toISOString().slice(0, 10);
+
 
 interface Live {
   id: number; имя: string;
@@ -30,7 +31,7 @@ export function Lesson() {
   const load = useCallback(async () => {
     try {
       const now = Date.now();
-      const all = await api.all<LessonRow>("lessons", `on_date=eq.${today()}&select=*`);
+      const all = await api.all<LessonRow>("lessons", `on_date=eq.${day()}&select=*`);
       for (const l of all) {
         if (l.is_open && new Date(l.started_at).getTime() < now - HOURS * 3600_000) {
           await api.patch("lessons", `id=eq.${l.id}`,
@@ -55,9 +56,9 @@ export function Lesson() {
 
       const [plan, answers, help, sessions] = await Promise.all([
         api.all<{ student_id: number; status: string }>("plan_items",
-          `student_id=${inList}&on_date=eq.${today()}&status=neq.cancelled&select=student_id,status`),
+          `student_id=${inList}&on_date=eq.${day()}&status=neq.cancelled&select=student_id,status`),
         api.all<{ student_id: number; is_correct: boolean; error_code: string | null; created_at: string }>(
-          "answers", `student_id=${inList}&created_at=gte.${today()}&select=student_id,is_correct,error_code,created_at`),
+          "answers", `student_id=${inList}&created_at=gte.${day()}&select=student_id,is_correct,error_code,created_at`),
         api.all<{ student_id: number; created_at: string }>("help_requests",
           `student_id=${inList}&resolved_at=is.null&select=student_id,created_at`),
         api.all<{ id: number; student_id: number }>("diag_sessions",
@@ -68,7 +69,7 @@ export function Lesson() {
       if (sessions.length) {
         const items = await api.all<{ session_id: number; answered_at: string }>("diag_items",
           `session_id=in.(${sessions.map(s => s.id).join(",")})` +
-          `&answered_at=gte.${today()}&select=session_id,answered_at`);
+          `&answered_at=gte.${day()}&select=session_id,answered_at`);
         for (const it of items) {
           const sid = owner.get(it.session_id);
           if (sid) diagCount.set(sid, (diagCount.get(sid) ?? 0) + 1);
@@ -123,7 +124,7 @@ export function Lesson() {
         await api.patch("lessons", `id=eq.${mine.id}`,
           { is_open: true, started_at: new Date().toISOString(), ended_at: null });
       } else {
-        await api.post("lessons", [{ group_id: group.id, on_date: today(), is_open: true }]);
+        await api.post("lessons", [{ group_id: group.id, on_date: day(), is_open: true }]);
       }
       await load();
     } catch (err) {

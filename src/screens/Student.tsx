@@ -1,6 +1,7 @@
 // Кабинет ученика. Диагностика — тихий замер. Тренировка — то, чем живут пять дней в неделю.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { day } from "../lib/day";
 import { dict } from "../lib/i18n";
 import { Card, Primary, Quiet, Tech } from "../components/Ui";
 import { Home, type HomeData } from "./Home";
@@ -20,8 +21,7 @@ type Phase =
   | { kind: "verdict"; correct: boolean; again: Task | null; left: number }
   | { kind: "diagDone" };
 
-const day = (shift = 0) =>
-  new Date(Date.now() + shift * 86_400_000).toISOString().slice(0, 10);
+
 
 export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   const t = dict(user.lang);
@@ -127,6 +127,14 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   }, [user]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // План может прийти, когда приложение уже открыто. Пока ребёнок на домашнем
+  // экране — тихо переспрашиваем базу, чтобы задачи появились сами.
+  useEffect(() => {
+    if (phase.kind !== "home") return;
+    const id = setInterval(() => { void load(); }, 60_000);
+    return () => clearInterval(id);
+  }, [phase.kind, load]);
 
   function nextDiagnostic() {
     const e = engine.current;

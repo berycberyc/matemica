@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Quiet, Tech } from "../components/Ui";
 import { api } from "../lib/api";
+import { day } from "../lib/day";
 import { Lesson } from "./Lesson";
 import { Notes } from "./Notes";
 import { Plan } from "./Plan";
@@ -8,7 +9,7 @@ import { Students } from "./Students";
 import type { Item, User } from "../lib/types";
 
 type TabName = "lesson" | "notes" | "plan" | "people";
-const today = () => new Date().toISOString().slice(0, 10);
+
 
 export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
   const [tab, setTab] = useState<TabName>("lesson");
@@ -84,7 +85,7 @@ function Export({ onError }: { onError: (m: string) => void }) {
         new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `matemica_${today()}.json`;
+      a.download = `matemica_${day()}.json`;
       a.click();
       URL.revokeObjectURL(url);
       setLabel(`Готово: ${items.length} ответов`);

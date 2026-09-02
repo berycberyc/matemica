@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { day as currentDay } from "../lib/day";
 import { Card, Primary, Quiet, Tech } from "../components/Ui";
 import { parsePlan, type PlanFile, type Preview } from "../lib/plan";
 import type { User } from "../lib/types";
@@ -27,7 +28,7 @@ export function Plan() {
         "status=neq.cancelled&select=student_id,on_date,status&order=on_date.asc");
       setRows(items);
       const days = [...new Set(items.map(i => i.on_date))].sort();
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = currentDay();
       setDay(days.find(d => d >= todayStr) ?? days[days.length - 1] ?? "");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
