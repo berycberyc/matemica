@@ -2,17 +2,23 @@
 // Логика ветвления живёт в engine.js.
 
 async function loadCatalog() {
-  const [topics, deps, tasks] = await Promise.all([
+  const [topics, deps, tasks, opts] = await Promise.all([
     API.get("topics", "select=ord,code,title_ru,title_kk"),
     API.get("topic_deps", "select=topic_ord,depends_on"),
     API.get("tasks", "is_active=is.true&select=id,topic_ord,level,answer_type,stem_ru,stem_kk," +
-                     "answer_num,target_seconds,options(id,pos,body,is_correct,error_code)")
+                     "answer_num,target_seconds"),
+    API.get("options", "select=id,task_id,pos,body,is_correct,error_code")
   ]);
+  if (!topics.length) throw new Error("в базе нет тем — не залит файл 02_topics.sql");
+  if (!tasks.length) throw new Error("в базе нет задач — не залит файл 07_bank.sql");
   topics.forEach(t => { S.topics[t.ord] = t; S.prereq[t.ord] = []; S.dependent[t.ord] = []; });
   deps.forEach(d => {
     if (S.prereq[d.topic_ord]) S.prereq[d.topic_ord].push(d.depends_on);
     if (S.dependent[d.depends_on]) S.dependent[d.depends_on].push(d.topic_ord);
   });
+  const byTask = {};
+  opts.forEach(o => (byTask[o.task_id] = byTask[o.task_id] || []).push(o));
+  tasks.forEach(t => { t.options = byTask[t.id] || []; });
   S.tasks = tasks;
   tasks.forEach(t => (S.byTopic[t.topic_ord] = S.byTopic[t.topic_ord] || []).push(t));
   for (const k in S.byTopic) S.byTopic[k].sort((a, b) => a.level - b.level);
@@ -121,7 +127,7 @@ async function saveAnswer(task, given, seconds) {
     const saved = await API.post("diag_items", [row]);
     S.items.push(saved[0] || row);
   } catch (e) {
-    show(errorCard(T("offline"), () => saveAnswer(task, given, seconds)));
+    show(errorCard(T("offline"), () => saveAnswer(task, given, seconds), e.message));
     return;
   }
   S.used.add(task.id);
@@ -129,9 +135,10 @@ async function saveAnswer(task, given, seconds) {
   step();
 }
 
-function errorCard(msg, retry) {
+function errorCard(msg, retry, detail) {
   const box = el("div", "card");
   box.appendChild(el("div", "stem", msg));
+  if (detail) box.appendChild(el("div", "tech", String(detail)));
   const b = el("button", "primary", T("next"));
   b.onclick = retry;
   box.appendChild(b);
@@ -165,7 +172,7 @@ async function boot(user) {
     await startSession();
     await step();
   } catch (e) {
-    show(errorCard(T("offline"), () => boot(user)));
+    show(errorCard(T("offline"), () => boot(user), e.message));
   }
 }
 
