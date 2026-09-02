@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { Card, Primary, Quiet, Tech } from "../components/Ui";
 import { Students } from "./Students";
+import { Plan } from "./Plan";
 import type { Group, Item, Lesson, Session, User } from "../lib/types";
 
 const WINDOW_HOURS = 2;
@@ -13,7 +14,7 @@ interface Board {
 }
 
 export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
-  const [tab, setTab] = useState<"today" | "people">("today");
+  const [tab, setTab] = useState<Tab>("today");
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -85,9 +86,11 @@ export function Teacher({ user, onExit }: { user: User; onExit: () => void }) {
       <div className="mb-5 flex gap-2">
         <Tab now={tab} me="today" set={setTab}>Сегодня</Tab>
         <Tab now={tab} me="people" set={setTab}>Ученики</Tab>
+        <Tab now={tab} me="plan" set={setTab}>План</Tab>
       </div>
 
       {tab === "people" && <Students />}
+      {tab === "plan" && <Plan />}
 
       {tab === "today" && error && <Card className="mb-4"><p>Не вышло.</p><Tech>{error}</Tech></Card>}
       {tab === "today" && !board && !error && <Card><p className="text-muted">Секунду…</p></Card>}
@@ -186,9 +189,11 @@ function Export({ onError }: { onError: (m: string) => void }) {
   return <Quiet onClick={() => { if (!busy) void run(); }}>{label}</Quiet>;
 }
 
+type Tab = "today" | "people" | "plan";
+
 function Tab(
   { now, me, set, children }:
-  { now: string; me: "today" | "people"; set: (v: "today" | "people") => void; children: string }
+  { now: string; me: Tab; set: (v: Tab) => void; children: string }
 ) {
   const on = now === me;
   return (
