@@ -11,6 +11,13 @@
 </head>
 <body>
 <div id="app"></div>
+<script>
+window.onerror = function (msg, src, line, col) {
+  var a = document.getElementById("app");
+  if (a) a.innerHTML = '<div class="card"><div class="stem">Страница не запустилась.</div>' +
+    '<div class="tech">' + msg + '<br>' + String(src).split("/").pop() + ', строка ' + line + ':' + col + '</div></div>';
+};
+</script>
 <script src="config.js"></script>
 <script src="core.js"></script>
 <script src="engine.js"></script>
