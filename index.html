@@ -1,26 +1,13 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>matemica</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1F6F6B">
+<title>matemica — diagnostic mathematics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500&family=Literata:opsz,wght@7..72,400;7..72,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Literata:opsz,wght@7..72,400;7..72,500&display=swap" rel="stylesheet">
 </head>
-<body>
-<div id="app"></div>
-<script>
-window.onerror = function (msg, src, line, col) {
-  var a = document.getElementById("app");
-  if (a) a.innerHTML = '<div class="card"><div class="stem">Страница не запустилась.</div>' +
-    '<div class="tech">' + msg + '<br>' + String(src).split("/").pop() + ', строка ' + line + ':' + col + '</div></div>';
-};
-</script>
-<script src="config.js"></script>
-<script src="core.js"></script>
-<script src="engine.js"></script>
-<script src="student.js"></script>
-</body>
+<body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
 </html>

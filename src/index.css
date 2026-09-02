@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-paper text-ink font-sans antialiased; }
+  button { -webkit-tap-highlight-color: transparent; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-teal; }
+}

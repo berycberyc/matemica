@@ -1,0 +1,116 @@
+import { useState } from "react";
+import { signIn, store } from "../lib/auth";
+import type { User } from "../lib/types";
+
+const ERRORS: Record<string, string> = {
+  empty: "Fill in both fields.",
+  nouser: "No such number.",
+  nopass: "That code doesn't match.",
+  offline: "Connection failed. Try again."
+};
+
+export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
+  const [login, setLogin] = useState("");
+  const [pass, setPass] = useState("");
+  const [show, setShow] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await signIn(login, pass);
+      if (!r.ok) { setError(ERRORS[r.reason] ?? "Sign in failed."); setBusy(false); return; }
+      store.save(r.user);
+      onSignedIn(r.user);
+    } catch {
+      setError(ERRORS.offline ?? null);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto grid max-w-5xl gap-14 px-6 py-14 md:grid-cols-[1.15fr_1fr] md:py-24">
+      <div>
+        <p className="text-sm tracking-wide text-teal">matemica</p>
+        <h1 className="mt-4 font-read text-[34px] leading-[1.25] md:text-[42px]">
+          A gap in mathematics is rarely where the mistake appears.
+        </h1>
+        <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-muted">
+          Percentages fail because parts of a number failed two years earlier. Equations fail
+          because of the order of operations. This system looks for the break itself, not the
+          symptom above it.
+        </p>
+
+        <div className="mt-10 space-y-6 border-t border-line pt-8">
+          <Section
+            title="Seventy-eight topics, ninety-six dependencies"
+            body="Every topic knows what it stands on. The map is a graph, not a list, so a wrong
+                  answer has somewhere to lead."
+          />
+          <Section
+            title="The next question depends on the last answer"
+            body="Answer well and the questions climb until they stop being easy. Miss, and the
+                  check descends toward the foundation. No two students take the same path."
+          />
+          <Section
+            title="Topics above a break are never asked"
+            body="They are marked too early rather than unknown. Those are different states, and
+                  confusing them wastes a term of teaching."
+          />
+          <Section
+            title="Every wrong option carries a named error"
+            body="Not incorrect, but took the average of two speeds. That is what makes a plan
+                  possible afterwards."
+          />
+        </div>
+      </div>
+
+      <div className="md:pt-16">
+        <div className="rounded-2xl border border-line bg-white p-7">
+          <h2 className="text-lg">Sign in</h2>
+          <p className="mt-1 text-sm text-muted">Digits only, both fields.</p>
+
+          <label className="mt-6 block text-sm text-muted" htmlFor="login">Number</label>
+          <input
+            id="login" inputMode="numeric" autoComplete="off" autoCapitalize="off"
+            value={login} onChange={e => setLogin(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-line px-4 py-3 text-lg
+                       focus:border-teal focus:outline-none"
+          />
+
+          <label className="mt-4 block text-sm text-muted" htmlFor="code">Code</label>
+          <input
+            id="code" inputMode="numeric" type={show ? "text" : "password"} autoComplete="off"
+            value={pass} onChange={e => setPass(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") void submit(); }}
+            className="mt-1 w-full rounded-xl border border-line px-4 py-3 text-lg
+                       focus:border-teal focus:outline-none"
+          />
+          <button
+            type="button" onClick={() => setShow(v => !v)}
+            className="mt-2 text-sm text-muted underline-offset-2 hover:underline"
+          >{show ? "Hide code" : "Show code"}</button>
+
+          <button
+            type="button" onClick={() => void submit()} disabled={busy}
+            className="mt-5 w-full rounded-xl bg-teal px-4 py-4 text-white
+                       active:bg-teal-dark disabled:opacity-50"
+          >{busy ? "…" : "Sign in"}</button>
+
+          {error && <p className="mt-3 text-sm text-red">{error}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, body }: { title: string; body: string }) {
+  return (
+    <div>
+      <h3 className="text-[17px]">{title}</h3>
+      <p className="mt-1 max-w-xl text-[15px] leading-relaxed text-muted">{body}</p>
+    </div>
+  );
+}
