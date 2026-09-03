@@ -122,7 +122,7 @@ export function Students() {
                   full_name: p.full_name, login: String(p.login), group_id: p.group_id,
                   lang: p.lang, note: p.note ?? ""
                 }}
-                groups={groups} active={p.is_active}
+                groups={groups} active={p.is_active} code={String(p.password)}
                 onCancel={() => setEditing(null)}
                 onSave={(d, active) => void save(p, d, active ?? true)}
                 onResetCode={() => void resetCode(p)}
@@ -158,10 +158,10 @@ export function Students() {
 }
 
 function Form(
-  { draft, groups, withLogin = false, active, loginTaken, onSave, onCancel, onResetCode }:
+  { draft, groups, withLogin = false, active, code, loginTaken, onSave, onCancel, onResetCode }:
   {
     draft: Draft; groups: Group[]; withLogin?: boolean; active?: boolean;
-    loginTaken?: Set<string>;
+    code?: string; loginTaken?: Set<string>;
     onSave: (d: Draft, active?: boolean) => void;
     onCancel: () => void;
     onResetCode?: () => void;
@@ -193,8 +193,11 @@ function Form(
         <input className={field} placeholder="Номер для входа" inputMode="numeric" value={d.login}
           onChange={e => setD({ ...d, login: e.target.value })} />
       ) : (
-        <div className="flex items-center gap-3 px-1 text-sm text-muted">
-          <span>Номер {d.login} — не меняется</span>
+        <div className="flex flex-wrap items-center gap-3 px-1 text-sm text-muted">
+          <span>
+            вход <b className="font-mono text-[16px] text-ink">{d.login}</b>
+            {code && <> · код <b className="font-mono text-[16px] text-ink">{code}</b></>}
+          </span>
           {onResetCode && <Quiet onClick={onResetCode}>Выдать новый код</Quiet>}
         </div>
       )}
