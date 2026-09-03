@@ -57,7 +57,7 @@ export function Lesson() {
       }
       if (tasks.size === 0) {
         const [taskRows, options] = await Promise.all([
-          api.all<Task>("tasks", "select=id,topic_ord,level,answer_type,stem_ru,stem_kk,answer_num"),
+          api.all<Task>("tasks", "select=id,topic_ord,level,answer_type,stem_ru,stem_kk,svg,answer_num"),
           api.all<Option>("options", "select=id,task_id,pos,body,is_correct,error_code")
         ]);
         for (const t of taskRows) {
@@ -311,6 +311,10 @@ function Detail(
         <div className="mt-4 rounded-2xl bg-paper p-5">
           <p className="text-[13px] uppercase tracking-[.14em] text-muted/70">Сейчас решает</p>
           <p className="mt-2 font-read text-[19px] leading-snug">{task.stem_ru}</p>
+          {task.svg && (
+            <div className="mt-3 flex justify-center"
+                 dangerouslySetInnerHTML={{ __html: task.svg }} />
+          )}
           {task.answer_type === "choice" ? (
             <p className="mt-3 text-[15px]">
               Верно: <b>{task.options.find(o => o.is_correct)?.body}</b>

@@ -16,7 +16,8 @@ export interface Option {
 }
 export interface Task {
   id: number; topic_ord: number; level: number; answer_type: AnswerType;
-  stem_ru: string; stem_kk: string | null; answer_num: string | number | null;
+  stem_ru: string; stem_kk: string | null; svg: string | null;
+  answer_num: string | number | null;
   target_seconds: number; options: Option[];
 }
 export interface Session {

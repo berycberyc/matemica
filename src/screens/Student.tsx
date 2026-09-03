@@ -51,7 +51,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
         api.all<Topic>("topics", "select=ord,code,title_ru,title_kk"),
         api.all<Dep>("topic_deps", "select=topic_ord,depends_on"),
         api.all<Task>("tasks", "is_active=is.true&select=id,topic_ord,level,answer_type," +
-                               "stem_ru,stem_kk,answer_num,target_seconds"),
+                               "stem_ru,stem_kk,svg,answer_num,target_seconds"),
         api.all<Option>("options", "select=id,task_id,pos,body,is_correct,error_code")
       ]);
       if (!topicRows.length) throw new Error("в базе нет тем — не залит 02_topics.sql");

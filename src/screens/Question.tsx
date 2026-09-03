@@ -30,6 +30,11 @@ export function Question(
       )}
       <p className="mt-3 font-read text-[21px] leading-[1.55]">{stem}</p>
 
+      {task.svg && (
+        <div className="mt-4 flex justify-center rounded-2xl bg-white py-2"
+             dangerouslySetInnerHTML={{ __html: task.svg }} />
+      )}
+
       {task.answer_type === "choice" ? (
         <div className="mt-5 space-y-2">
           {task.options.map(o => (
