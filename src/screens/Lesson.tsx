@@ -343,12 +343,19 @@ function Tile(
   return (
     <button type="button"
       onClick={() => { if (r.спросил) onClear(); onOpen(); }}
-      className={`flex min-h-[124px] flex-col gap-0.5 rounded-2xl px-4 py-3 text-left
+      className={`relative flex min-h-[124px] flex-col gap-0.5 rounded-2xl px-4 py-3 text-left
                   shadow-[0_1px_2px_rgba(20,48,46,.06)] transition active:scale-[.99]
                   ${shadeFor(min)}
-                  ${r.спросил ? "border-2 border-[#2F6FA8]" : "border-2 border-line"}
+                  ${r.спросил ? "border-2 border-teal hand-pulse" : "border-2 border-line"}
                   ${r.начал ? "" : "opacity-70"}`}>
-      <div className="truncate font-read text-[26px] leading-tight text-ink">{r.имя}</div>
+
+      {r.спросил > 0 && (
+        <span className="absolute right-2.5 top-2 flex items-center gap-1">
+          <span className="hand-wave text-[30px] leading-none">✋</span>
+        </span>
+      )}
+
+      <div className="truncate pr-9 font-read text-[26px] leading-tight text-ink">{r.имя}</div>
       <div className="truncate text-[12.5px] leading-snug text-muted">
         {r.тема ?? (r.план ? `${r.сделано} из ${r.план}` : "диагностика")}
       </div>
@@ -364,10 +371,9 @@ function Tile(
           <span className="text-[15px] leading-none text-muted">не начал</span>
         )}
         {r.спросил > 0 && (
-          <span className="ml-auto flex items-center gap-1 whitespace-nowrap
-                           font-mono text-[11.5px] text-[#2F6FA8]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#2F6FA8]" />
-            рука {r.ждёт < 999 ? `${r.ждёт}′` : ""}
+          <span className="ml-auto whitespace-nowrap font-mono text-[11.5px] text-teal">
+            ждёт {r.ждёт < 999 ? `${r.ждёт} мин` : ""}
+            {r.спросил > 1 ? ` · ${r.спросил}×` : ""}
           </span>
         )}
       </div>
@@ -401,8 +407,9 @@ function Legend() {
       <span className="flex items-center gap-2 whitespace-nowrap text-red">
         <span className="h-1.5 w-1.5 rounded-full bg-red" />ошибки
       </span>
-      <span className="flex items-center gap-2 whitespace-nowrap text-[#2F6FA8]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#2F6FA8]" />рука — просит помощи
+      <span className="flex items-center gap-2 whitespace-nowrap text-teal">
+        <span className="text-[15px] leading-none">✋</span>рука — просит подойти,
+        нажми, когда подошёл
       </span>
     </div>
   );
