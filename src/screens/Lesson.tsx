@@ -5,7 +5,7 @@ import { day } from "../lib/day";
 import { Card, Tech } from "../components/Ui";
 import { shortNames } from "../lib/names";
 import { listen, type LiveState } from "../lib/live";
-import type { Group, Lesson as LessonRow, Option, Task, User } from "../lib/types";
+import type { Group, Lesson as LessonRow, Option, Task, Topic, User } from "../lib/types";
 
 const HOURS = 2;
 
@@ -40,6 +40,8 @@ export function Lesson() {
   const [live, setLive] = useState<LiveState>("переспрос");
   const [openCard, setOpenCard] = useState<number | null>(null);
   const [tasks, setTasks] = useState<Map<number, Task>>(new Map());
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [saving, setSaving] = useState(false);
   const [details, setDetails] = useState<Details>({ plan: [], answers: [], diagItems: [] });
 
   const open = lessons.find(l => l.is_open);
@@ -64,6 +66,10 @@ export function Lesson() {
           t.options = options.filter(o => o.task_id === t.id).sort((a, b) => a.pos - b.pos);
         }
         setTasks(new Map(taskRows.map(t => [t.id, t])));
+      }
+      if (!topics.length) {
+        setTopics(await api.all<Topic>("topics",
+          "select=ord,code,title_ru,title_kk&order=ord.asc"));
       }
       const [gs, people] = await Promise.all([
         api.all<Group>("groups", "is_active=is.true&select=id,name&order=name.asc"),
@@ -174,6 +180,15 @@ export function Lesson() {
     setBusy(false);
   }
 
+  // Урок главнее цифр: планировщику надо знать, что разбирали,
+  // иначе вечерний план заспорит с уроком.
+  async function setLessonTopic(l: LessonRow, ord: number | null) {
+    setSaving(true);
+    await api.patch("lessons", `id=eq.${l.id}`, { topic_ord: ord }).catch(() => undefined);
+    await load();
+    setSaving(false);
+  }
+
   async function clearHelp(id: number) {
     await api.patch("help_requests", `student_id=eq.${id}&resolved_at=is.null`,
       { resolved_at: new Date().toISOString() }).catch(() => undefined);
@@ -222,6 +237,25 @@ export function Lesson() {
         <span className="text-sm text-muted">закроется через {left} мин</span>
         <button type="button" disabled={busy} onClick={() => void stop(open)}
           className="rounded-xl bg-red/10 px-4 py-2.5 text-sm text-red">Закончить</button>
+      </div>
+
+      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl bg-white px-5 py-4">
+        <span className="text-[15px] text-muted">Разбираем сегодня</span>
+        <select
+          value={open.topic_ord ?? ""} disabled={saving}
+          onChange={e => void setLessonTopic(open, e.target.value ? Number(e.target.value) : null)}
+          className="min-w-[260px] flex-1 rounded-xl bg-paper px-4 py-2.5 outline-none
+                     focus:ring-2 focus:ring-teal">
+          <option value="">не выбрано</option>
+          {topics.map(t => (
+            <option key={t.ord} value={t.ord}>{t.code} {t.title_ru}</option>
+          ))}
+        </select>
+        {open.topic_ord === null && (
+          <span className="text-sm text-amber">
+            без этого вечерний план не будет знать, что вы объясняли
+          </span>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2.5">

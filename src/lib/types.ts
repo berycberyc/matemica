@@ -30,5 +30,6 @@ export interface Item {
   seconds: number | null; answered_at?: string; supervised?: boolean;
 }
 export interface Lesson {
-  id: number; group_id: number; on_date: string; is_open: boolean; started_at: string;
+  id: number; group_id: number; on_date: string; is_open: boolean;
+  started_at: string; topic_ord: number | null;
 }
