@@ -27,6 +27,8 @@ interface Live {
   ошибок: number; последняя: string | null;
   спросил: number;
   ждёт: number;
+  молчит: number | null;      // когда отвечал последний раз, null — сегодня ещё не отвечал
+  тема: string | null;        // что решает сейчас или что решал последним
   диагностика: number;
   начал: boolean;
 }
@@ -67,9 +69,11 @@ export function Lesson() {
         }
         setTasks(new Map(taskRows.map(t => [t.id, t])));
       }
-      if (!topics.length) {
-        setTopics(await api.all<Topic>("topics",
-          "select=ord,code,title_ru,title_kk&order=ord.asc"));
+      let topicList = topics;
+      if (!topicList.length) {
+        topicList = await api.all<Topic>("topics",
+          "select=ord,code,title_ru,title_kk&order=ord.asc");
+        setTopics(topicList);
       }
       const [gs, people] = await Promise.all([
         api.all<Group>("groups", "is_active=is.true&select=id,name&order=name.asc"),
@@ -116,14 +120,36 @@ export function Lesson() {
       const names = shortNames(mine);
       setDetails({ plan, answers, diagItems: lastDiag });
 
+      const lastAnswerAt = (id: number): number | null => {
+        let last = 0;
+        for (const a of answers) {
+          if (a.student_id === id) last = Math.max(last, new Date(a.created_at).getTime());
+        }
+        for (const d of lastDiag) {
+          if (d.student_id === id) last = Math.max(last, new Date(d.answered_at).getTime());
+        }
+        return last || null;
+      };
+      const topicName = (ord: number | undefined) =>
+        ord === undefined ? null
+          : (topicList.find(t => t.ord === ord)?.title_ru ?? null);
+
       setRows(mine.map(p => {
         const mineAns = answers.filter(a => a.student_id === p.id);
         const wrong = mineAns.filter(a => !a.is_correct);
         const last = wrong.length ? wrong[wrong.length - 1] : undefined;
         const planRows = plan.filter(x => x.student_id === p.id);
         const diag = diagCount.get(p.id) ?? 0;
+        const myPlan = plan.filter(x => x.student_id === p.id);
+        const current = myPlan.find(x => x.status === "pending");
+        const lastDiagMine = lastDiag.filter(x => x.student_id === p.id);
+        const lastTask = current
+          ? tasks.get(current.task_id)
+          : tasks.get(lastDiagMine[lastDiagMine.length - 1]?.task_id ?? -1);
         return {
           id: p.id, имя: names.get(p.id) ?? p.full_name,
+          молчит: lastAnswerAt(p.id),
+          тема: topicName(lastTask?.topic_ord),
           план: planRows.length,
           сделано: planRows.filter(x => x.status === "done").length,
           ошибок: wrong.length,
@@ -220,11 +246,6 @@ export function Lesson() {
   const group = groups.find(g => g.id === open.group_id);
   const left = Math.max(0, Math.round(
     (new Date(open.started_at).getTime() + HOURS * 3600_000 - Date.now()) / 60_000));
-  const order = [...rows].sort((a, b) =>
-    (b.спросил ? 1 : 0) - (a.спросил ? 1 : 0) ||
-    b.ошибок - a.ошибок ||
-    a.имя.localeCompare(b.имя, "ru"));
-
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -251,20 +272,13 @@ export function Lesson() {
             <option key={t.ord} value={t.ord}>{t.code} {t.title_ru}</option>
           ))}
         </select>
-        {open.topic_ord === null && (
-          <span className="text-sm text-amber">
-            без этого вечерний план не будет знать, что вы объясняли
-          </span>
-        )}
       </div>
 
-      <div className="flex flex-wrap gap-2.5">
-        {order.map(r => (
-          <Tile key={r.id} r={r}
-            onOpen={() => setOpenCard(openCard === r.id ? null : r.id)}
-            onClear={() => void clearHelp(r.id)} />
-        ))}
-      </div>
+      <Grid rows={rows} startedAt={open.started_at}
+            onOpen={id => setOpenCard(openCard === id ? null : id)}
+            onClear={id => void clearHelp(id)} />
+
+      <Legend />
 
       {openCard !== null && (
         <Detail
@@ -276,47 +290,121 @@ export function Lesson() {
           onClose={() => setOpenCard(null)}
         />
       )}
-
-      <p className="mt-5 text-sm text-muted">
-        Синим — кто просит подойти, нажми, когда подошёл. Чем темнее плитка, тем больше ошибок.
-      </p>
     </>
   );
 }
 
-// Ошибки показываем не цветом тревоги, а густотой: одна ошибка — ещё не беда,
-// три подряд — уже видно с другого конца стола.
-const SHADES = ["bg-paper", "bg-[#EFE6E2]", "bg-[#E3D2CA]", "bg-[#D5BCB1]"];
+// Главный сигнал — тишина: сколько минут от человека нет ответа.
+// Ошибка значит, что ребёнок работает. Застрявший как раз молчит.
+const DARK = 5;
+const SHADES = ["bg-white", "bg-[#E2E8E4]", "bg-[#D2DBD6]", "bg-[#C0CCC6]"];
+
+function silenceMin(r: Live, startedAt: string): number {
+  const from = r.молчит ?? new Date(startedAt).getTime();
+  return Math.max(0, (Date.now() - from) / 60_000);
+}
+
+function shadeFor(min: number): string {
+  const step = min < 2 ? 0 : min < DARK * 0.6 ? 1 : min < DARK ? 2 : 3;
+  return SHADES[step] ?? "bg-white";
+}
+
+function Grid(
+  { rows, startedAt, onOpen, onClear }:
+  { rows: Live[]; startedAt: string; onOpen: (id: number) => void; onClear: (id: number) => void }
+) {
+  // минуты считаем при отрисовке и подталкиваем раз в 20 секунд,
+  // иначе цифра стоит на месте между событиями живой связи
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick(n => n + 1), 20_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const order = [...rows].sort((a, b) =>
+    silenceMin(b, startedAt) - silenceMin(a, startedAt) ||
+    a.имя.localeCompare(b.имя, "ru"));
+
+  return (
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+      {order.map(r => (
+        <Tile key={r.id} r={r} min={silenceMin(r, startedAt)}
+              onOpen={() => onOpen(r.id)} onClear={() => onClear(r.id)} />
+      ))}
+    </div>
+  );
+}
 
 function Tile(
-  { r, onOpen, onClear }: { r: Live; onOpen: () => void; onClear: () => void }
+  { r, min, onOpen, onClear }:
+  { r: Live; min: number; onOpen: () => void; onClear: () => void }
 ) {
-  if (r.спросил) {
-    return (
-      <button type="button" onClick={() => { onClear(); onOpen(); }}
-        className="rounded-2xl bg-[#2F6FA8] px-4 py-3 text-left text-white transition active:scale-95">
-        <div className="font-read text-[19px]">{r.имя}</div>
-        <div className="text-[13px] text-white/75">
-          просит подойти{r.спросил > 1 ? ` · ${r.спросил} раза` : ""}
-          {r.ждёт < 999 ? ` · ${r.ждёт} мин` : ""}
-        </div>
-      </button>
-    );
-  }
-  const shade = SHADES[Math.min(r.ошибок, SHADES.length - 1)] ?? "bg-paper";
+  const answers = r.сделано + r.диагностика;
   return (
-    <button type="button" onClick={onOpen}
-      className={`rounded-2xl px-4 py-3 text-left transition active:scale-95
-                  ${shade} ${r.начал ? "" : "opacity-50"}`}>
-      <div className="font-read text-[19px]">{r.имя}</div>
-      <div className="text-[13px] text-muted">
-        {r.ошибок > 0
-          ? `${r.ошибок} ${r.ошибок === 1 ? "ошибка" : "ошибок"}`
-          : r.диагностика > 0 ? `${r.диагностика} отв.`
-          : r.план ? `${r.сделано} из ${r.план}`
-          : r.начал ? "идёт" : "не начал"}
+    <button type="button"
+      onClick={() => { if (r.спросил) onClear(); onOpen(); }}
+      className={`flex min-h-[124px] flex-col gap-0.5 rounded-2xl px-4 py-3 text-left
+                  shadow-[0_1px_2px_rgba(20,48,46,.06)] transition active:scale-[.99]
+                  ${shadeFor(min)}
+                  ${r.спросил ? "border-2 border-[#2F6FA8]" : "border-2 border-line"}
+                  ${r.начал ? "" : "opacity-70"}`}>
+      <div className="truncate font-read text-[26px] leading-tight text-ink">{r.имя}</div>
+      <div className="truncate text-[12.5px] leading-snug text-muted">
+        {r.тема ?? (r.план ? `${r.сделано} из ${r.план}` : "диагностика")}
+      </div>
+
+      <div className="flex-1" />
+
+      <div className="flex items-baseline gap-2">
+        {r.начал ? (
+          <span className="font-mono text-[22px] font-medium leading-none text-ink">
+            {min < 1 ? "<1" : Math.round(min)} мин
+          </span>
+        ) : (
+          <span className="text-[15px] leading-none text-muted">не начал</span>
+        )}
+        {r.спросил > 0 && (
+          <span className="ml-auto flex items-center gap-1 whitespace-nowrap
+                           font-mono text-[11.5px] text-[#2F6FA8]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#2F6FA8]" />
+            рука {r.ждёт < 999 ? `${r.ждёт}′` : ""}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 font-mono text-[11.5px] leading-tight">
+        {r.ошибок > 0 && (
+          <span className="flex items-center gap-1 whitespace-nowrap text-red">
+            <span className="h-1.5 w-1.5 rounded-full bg-red" />
+            {r.ошибок} ош.
+          </span>
+        )}
+        <span className="ml-auto whitespace-nowrap text-muted">{answers} отв.</span>
       </div>
     </button>
+  );
+}
+
+function Legend() {
+  const steps: [string, string][] = [
+    ["bg-white", "до 2 мин"], ["bg-[#E2E8E4]", "2–3"],
+    ["bg-[#D2DBD6]", "3–5"], ["bg-[#C0CCC6]", "5 мин и больше"]
+  ];
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11.5px] text-muted">
+      <span className="text-ink">Тишина — сколько минут нет ответа:</span>
+      {steps.map(([bg, label]) => (
+        <span key={label} className="flex items-center gap-2 whitespace-nowrap">
+          <span className={`h-3 w-6 rounded border border-line ${bg}`} />{label}
+        </span>
+      ))}
+      <span className="flex items-center gap-2 whitespace-nowrap text-red">
+        <span className="h-1.5 w-1.5 rounded-full bg-red" />ошибки
+      </span>
+      <span className="flex items-center gap-2 whitespace-nowrap text-[#2F6FA8]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#2F6FA8]" />рука — просит помощи
+      </span>
+    </div>
   );
 }
 
