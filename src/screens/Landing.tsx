@@ -11,10 +11,10 @@ const ERRORS: Record<string, string> = {
 };
 
 const PRINCIPLES: [string, string][] = [
-  ["Directed Graph of Knowledge Architecture — 78 concepts, 96 dependencies",
-   "The curriculum is structured not as a linear list, but as a strictly hierarchical " +
-   "directed acyclic graph. Every cognitive concept is functionally tied to its " +
-   "underlying prerequisites."],
+  ["Directed Graph of Knowledge Architecture",
+   "The curriculum is represented not as a linear sequence but as a strictly hierarchical " +
+   "directed acyclic graph. Each construct is formally bound to the prerequisite " +
+   "constructs upon which it depends."],
   ["Adaptive Recursive Testing",
    "The assessment algorithm operates recursively. Upon a correct response, the testing " +
    "trajectory advances toward higher conceptual complexity. When an error occurs, the " +
@@ -101,7 +101,30 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
           ))}
         </div>
 
-        <p className="mt-12 border-t border-line pt-8 text-[15px] leading-relaxed text-muted">
+        <h2 className="mt-12 border-t border-line pt-8 text-[13px] uppercase
+                       tracking-[.16em] text-muted/70">
+          Methodological provenance
+        </h2>
+        <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted">
+          The measurement principles applied here — adaptive testing, distractor analysis,
+          and response latency as an indicator of cognitive fluency — are anchored in the
+          methodological framework of educational measurement advanced by the National
+          Institute for Educational Measurement (
+          <a href="https://www.cito.nl" target="_blank" rel="noopener noreferrer"
+             className="text-teal underline underline-offset-2">Cito</a>, Netherlands).
+          The instrument itself, including the dependency graph, the item bank and the
+          descent procedure, was constructed independently for this practice and is not
+          affiliated with, endorsed by, or validated by that institute.
+        </p>
+        <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
+          Psychometric characterisation of the item bank — difficulty and discrimination
+          indices, and empirical calibration of the latency threshold — is pending the
+          accumulation of sufficient response data. Until that point the instrument is to
+          be regarded as a diagnostic aid to instruction rather than a calibrated
+          measurement scale.
+        </p>
+
+        <p className="mt-8 max-w-xl text-[15px] leading-relaxed text-muted">
           Designed as an institutional tool to enhance teaching practice and diagnostic
           precision, providing educators with actionable data to structure effective
           learning trajectories.

@@ -27,10 +27,10 @@ const COLOR: Record<string, string> = {
 };
 
 const LEGEND: [string, string][] = [
-  ["closed", "Closed"],
-  ["slow", "Correct, but slow"],
-  ["break", "The break"],
-  ["early", "Premature — stands on the break"]
+  ["closed", "Mastered"],
+  ["slow", "Accurate, low fluency"],
+  ["break", "Point of deficiency"],
+  ["early", "Suspended as premature"]
 ];
 
 export function MapFigure() {
@@ -71,9 +71,10 @@ export function MapFigure() {
       </figcaption>
 
       <p className="mt-5 text-[13px] leading-relaxed text-muted/80">
-        An illustration of how the map is read, not a record of results. Percentages and
-        everything above them were never asked: they stand on a topic already known to
-        have broken, and asking them would have measured nothing.
+        A schematic illustration of the diagnostic output, not empirical data. Percentages
+        and the constructs above them were not administered: they depend on a prerequisite
+        already identified as deficient, and their evaluation would carry no diagnostic
+        information.
       </p>
     </figure>
   );
