@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { day } from "../lib/day";
+import { flush, keepTrying, pending, put } from "../lib/outbox";
 import { dict } from "../lib/i18n";
 import { Card, Primary, Quiet, Tech } from "../components/Ui";
 import { Home, type HomeData } from "./Home";
@@ -27,6 +28,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   const t = dict(user.lang);
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [home, setHome] = useState<HomeData | null>(null);
+  const [queued, setQueued] = useState(0);
 
   const engine = useRef<Engine | null>(null);
   const session = useRef<Session | null>(null);
@@ -41,6 +43,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   const load = useCallback(async () => {
     setPhase({ kind: "loading" });
     try {
+      await flush();
       const [topicRows, deps, taskRows, options] = await Promise.all([
         api.all<Topic>("topics", "select=ord,code,title_ru,title_kk"),
         api.all<Dep>("topic_deps", "select=topic_ord,depends_on"),
@@ -128,6 +131,8 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => keepTrying(setQueued), []);
+
   // План может прийти, когда приложение уже открыто. Пока ребёнок на домашнем
   // экране — тихо переспрашиваем базу, чтобы задачи появились сами.
   useEffect(() => {
@@ -189,9 +194,9 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
     };
     try {
       await api.post<Item>("diag_items", [row]);
-    } catch (err) {
-      setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-      return;
+    } catch {
+      put("diag_items", row);          // связи нет — ответ не потерян, уйдёт позже
+      setQueued(pending());
     }
     items.current.push(row);
     e.used.add(task.id);
@@ -211,19 +216,20 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
     const seconds = Math.round((performance.now() - shownAt.current) / 1000);
     const verdict = judge(task, given);
     const fromPlan = !isRetry && queue.current[0]?.task_id === task.id;
+    const answer = {
+      student_id: user.id, task_id: task.id, topic_ord: task.topic_ord,
+      source: fromPlan ? (supervised.current ? "lesson" : "home") : "extra",
+      given, is_correct: verdict.correct, error_code: verdict.code, seconds
+    };
     try {
-      await api.post("answers", [{
-        student_id: user.id, task_id: task.id, topic_ord: task.topic_ord,
-        source: fromPlan ? (supervised.current ? "lesson" : "home") : "extra",
-        given, is_correct: verdict.correct, error_code: verdict.code, seconds
-      }]);
+      await api.post("answers", [answer]);
       if (fromPlan) {
         const row = queue.current[0];
         if (row) await api.patch("plan_items", `id=eq.${row.id}`, { status: "done" });
       }
-    } catch (err) {
-      setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-      return;
+    } catch {
+      put("answers", answer);
+      setQueued(pending());
     }
     if (fromPlan) queue.current.shift();
 
@@ -252,6 +258,12 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
         <span className="flex-1 truncate text-sm text-muted">{user.full_name}</span>
         <Quiet onClick={onExit}>{t.exit}</Quiet>
       </div>
+
+      {queued > 0 && (
+        <p className="mb-3 rounded-xl bg-[#FFF6E6] px-4 py-2 text-[14px] text-amber">
+          {t.saved} {queued}
+        </p>
+      )}
 
       {phase.kind === "loading" && <Card><p className="text-muted">{t.loading}</p></Card>}
 
