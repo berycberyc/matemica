@@ -66,7 +66,7 @@ select id from t;
 -- тема 603, уровень 1
 with t as (
   insert into tasks (topic_ord, level, answer_type, stem_ru, stem_kk, answer_num, target_seconds, svg)
-  values (603, 1, 'choice', 'Найди площадь прямоугольника в квадратных сантиметрах.', 'Тіктөртбұрыштың ауданын шаршы сантиметрмен тап.', 28.0, 60, '<svg viewBox="0 0 262 184" xmlns="http://www.w3.org/2000/svg" font-family="Onest, sans-serif" font-size="15"><rect x="40" y="40" width="182" height="104" fill="#E6F0EE" stroke="#14302E" stroke-width="2"/><text x="131.0" y="170.0" fill="#1F6F6B" text-anchor="middle" font-size="15">7 см</text><text x="26.0" y="97.0" fill="#1F6F6B" text-anchor="end" font-size="15">4 см</text></svg>') returning id
+  values (603, 1, 'choice', 'Найди площадь прямоугольника в квадратных сантиметрах.', 'Тіктөртбұрыштың ауданын шаршы сантиметрмен тап.', 28.0, 60, '<svg viewBox="0 0 292 178" xmlns="http://www.w3.org/2000/svg" font-family="Onest, sans-serif" font-size="15"><rect x="70" y="30" width="182" height="104" fill="#E6F0EE" stroke="#14302E" stroke-width="2"/><text x="161.0" y="162.0" fill="#1F6F6B" text-anchor="middle" font-size="15">7 см</text><text x="56.0" y="87.0" fill="#1F6F6B" text-anchor="end" font-size="15">4 см</text></svg>') returning id
 )
 insert into options (task_id, pos, body, is_correct, error_code) values
     ((select id from t), 1, '14', false, 'удвоил одну сторону'),
@@ -77,7 +77,7 @@ insert into options (task_id, pos, body, is_correct, error_code) values
 -- тема 603, уровень 2
 with t as (
   insert into tasks (topic_ord, level, answer_type, stem_ru, stem_kk, answer_num, target_seconds, svg)
-  values (603, 2, 'choice', 'Найди периметр прямоугольника в сантиметрах.', 'Тіктөртбұрыштың периметрін сантиметрмен тап.', 22.0, 90, '<svg viewBox="0 0 288 158" xmlns="http://www.w3.org/2000/svg" font-family="Onest, sans-serif" font-size="15"><rect x="40" y="40" width="208" height="78" fill="#E6F0EE" stroke="#14302E" stroke-width="2"/><text x="144.0" y="144.0" fill="#1F6F6B" text-anchor="middle" font-size="15">8 см</text><text x="26.0" y="84.0" fill="#1F6F6B" text-anchor="end" font-size="15">3 см</text></svg>') returning id
+  values (603, 2, 'choice', 'Найди периметр прямоугольника в сантиметрах.', 'Тіктөртбұрыштың периметрін сантиметрмен тап.', 22.0, 90, '<svg viewBox="0 0 318 152" xmlns="http://www.w3.org/2000/svg" font-family="Onest, sans-serif" font-size="15"><rect x="70" y="30" width="208" height="78" fill="#E6F0EE" stroke="#14302E" stroke-width="2"/><text x="174.0" y="136.0" fill="#1F6F6B" text-anchor="middle" font-size="15">8 см</text><text x="56.0" y="74.0" fill="#1F6F6B" text-anchor="end" font-size="15">3 см</text></svg>') returning id
 )
 insert into options (task_id, pos, body, is_correct, error_code) values
     ((select id from t), 1, '11', false, 'сложил стороны без удвоения'),
@@ -88,7 +88,7 @@ insert into options (task_id, pos, body, is_correct, error_code) values
 -- тема 603, уровень 3
 with t as (
   insert into tasks (topic_ord, level, answer_type, stem_ru, stem_kk, answer_num, target_seconds, svg)
-  values (603, 3, 'number', 'Периметр прямоугольника равен 26 сантиметрам, одна сторона показана на рисунке. Найди площадь в квадратных сантиметрах.', 'Тіктөртбұрыштың периметрі 26 сантиметр, бір қабырғасы суретте көрсетілген. Ауданын шаршы сантиметрмен тап.', 36.0, 150, '<svg viewBox="0 0 314 184" xmlns="http://www.w3.org/2000/svg" font-family="Onest, sans-serif" font-size="15"><rect x="40" y="40" width="234" height="104" fill="#E6F0EE" stroke="#14302E" stroke-width="2"/><text x="157.0" y="170.0" fill="#1F6F6B" text-anchor="middle" font-size="15">9 см</text><text x="26.0" y="97.0" fill="#1F6F6B" text-anchor="end" font-size="15">?</text></svg>') returning id
+  values (603, 3, 'number', 'Периметр прямоугольника равен 26 сантиметрам, одна сторона показана на рисунке. Найди площадь в квадратных сантиметрах.', 'Тіктөртбұрыштың периметрі 26 сантиметр, бір қабырғасы суретте көрсетілген. Ауданын шаршы сантиметрмен тап.', 36.0, 150, '<svg viewBox="0 0 344 178" xmlns="http://www.w3.org/2000/svg" font-family="Onest, sans-serif" font-size="15"><rect x="70" y="30" width="234" height="104" fill="#E6F0EE" stroke="#14302E" stroke-width="2"/><text x="187.0" y="162.0" fill="#1F6F6B" text-anchor="middle" font-size="15">9 см</text><text x="56.0" y="87.0" fill="#1F6F6B" text-anchor="end" font-size="15">?</text></svg>') returning id
 )
 select id from t;
 
