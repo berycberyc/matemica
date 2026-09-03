@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { store } from "./lib/auth";
+import { NewVersion } from "./components/NewVersion";
 import { Landing } from "./screens/Landing";
 import { Student } from "./screens/Student";
 import { Teacher } from "./screens/Teacher";
@@ -13,7 +14,12 @@ export function App() {
     setUser(null);
   }
 
-  if (!user) return <Landing onSignedIn={setUser} />;
-  if (user.role === "student") return <Student user={user} onExit={exit} />;
-  return <Teacher user={user} onExit={exit} />;
+  return (
+    <>
+      <div className="mx-auto max-w-4xl px-4"><NewVersion /></div>
+      {!user ? <Landing onSignedIn={setUser} />
+        : user.role === "student" ? <Student user={user} onExit={exit} />
+        : <Teacher user={user} onExit={exit} />}
+    </>
+  );
 }

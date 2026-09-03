@@ -4,10 +4,22 @@ import { api } from "../lib/api";
 import { day } from "../lib/day";
 import { Card, Tech } from "../components/Ui";
 import { shortNames } from "../lib/names";
-import type { Group, Lesson as LessonRow, User } from "../lib/types";
+import { listen, type LiveState } from "../lib/live";
+import type { Group, Lesson as LessonRow, Option, Task, User } from "../lib/types";
 
 const HOURS = 2;
 
+
+interface PlanRow { student_id: number; status: string; task_id: number; pos: number }
+interface AnswerRow {
+  student_id: number; task_id: number; given: string | null;
+  is_correct: boolean; error_code: string | null; created_at: string;
+}
+interface DiagRow {
+  session_id: number; student_id?: number; task_id: number; given: string | null;
+  is_correct: boolean; error_code: string | null; answered_at: string;
+}
+interface Details { plan: PlanRow[]; answers: AnswerRow[]; diagItems: DiagRow[] }
 
 interface Live {
   id: number; имя: string;
@@ -25,6 +37,10 @@ export function Lesson() {
   const [rows, setRows] = useState<Live[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState<LiveState>("переспрос");
+  const [openCard, setOpenCard] = useState<number | null>(null);
+  const [tasks, setTasks] = useState<Map<number, Task>>(new Map());
+  const [details, setDetails] = useState<Details>({ plan: [], answers: [], diagItems: [] });
 
   const open = lessons.find(l => l.is_open);
 
@@ -38,6 +54,16 @@ export function Lesson() {
             { is_open: false, ended_at: new Date().toISOString() });
           l.is_open = false;
         }
+      }
+      if (tasks.size === 0) {
+        const [taskRows, options] = await Promise.all([
+          api.all<Task>("tasks", "select=id,topic_ord,level,answer_type,stem_ru,stem_kk,answer_num"),
+          api.all<Option>("options", "select=id,task_id,pos,body,is_correct,error_code")
+        ]);
+        for (const t of taskRows) {
+          t.options = options.filter(o => o.task_id === t.id).sort((a, b) => a.pos - b.pos);
+        }
+        setTasks(new Map(taskRows.map(t => [t.id, t])));
       }
       const [gs, people] = await Promise.all([
         api.all<Group>("groups", "is_active=is.true&select=id,name&order=name.asc"),
@@ -55,10 +81,12 @@ export function Lesson() {
       const inList = `in.(${ids.join(",")})`;
 
       const [plan, answers, help, sessions] = await Promise.all([
-        api.all<{ student_id: number; status: string }>("plan_items",
-          `student_id=${inList}&on_date=eq.${day()}&status=neq.cancelled&select=student_id,status`),
-        api.all<{ student_id: number; is_correct: boolean; error_code: string | null; created_at: string }>(
-          "answers", `student_id=${inList}&created_at=gte.${day()}&select=student_id,is_correct,error_code,created_at`),
+        api.all<PlanRow>("plan_items",
+          `student_id=${inList}&on_date=eq.${day()}&status=neq.cancelled` +
+          `&select=student_id,status,task_id,pos&order=pos.asc`),
+        api.all<AnswerRow>("answers",
+          `student_id=${inList}&created_at=gte.${day()}` +
+          `&select=student_id,task_id,given,is_correct,error_code,created_at&order=created_at.asc`),
         api.all<{ student_id: number; created_at: string }>("help_requests",
           `student_id=${inList}&resolved_at=is.null&select=student_id,created_at`),
         api.all<{ id: number; student_id: number }>("diag_sessions",
@@ -66,16 +94,21 @@ export function Lesson() {
       ]);
       const owner = new Map(sessions.map(s => [s.id, s.student_id]));
       const diagCount = new Map<number, number>();
+      const lastDiag: DiagRow[] = [];
       if (sessions.length) {
-        const items = await api.all<{ session_id: number; answered_at: string }>("diag_items",
-          `session_id=in.(${sessions.map(s => s.id).join(",")})` +
-          `&answered_at=gte.${day()}&select=session_id,answered_at`);
+        const items = await api.all<DiagRow>("diag_items",
+          `session_id=in.(${sessions.map(s => s.id).join(",")})&answered_at=gte.${day()}` +
+          `&select=session_id,task_id,given,is_correct,error_code,answered_at&order=answered_at.asc`);
         for (const it of items) {
           const sid = owner.get(it.session_id);
-          if (sid) diagCount.set(sid, (diagCount.get(sid) ?? 0) + 1);
+          if (sid) {
+            diagCount.set(sid, (diagCount.get(sid) ?? 0) + 1);
+            lastDiag.push({ ...it, student_id: sid });
+          }
         }
       }
       const names = shortNames(mine);
+      setDetails({ plan, answers, diagItems: lastDiag });
 
       setRows(mine.map(p => {
         const mineAns = answers.filter(a => a.student_id === p.id);
@@ -105,8 +138,8 @@ export function Lesson() {
 
   useEffect(() => {
     void load();
-    const id = setInterval(() => void load(), 10_000);
-    return () => clearInterval(id);
+    return listen(["diag_items", "answers", "help_requests", "plan_items", "lessons"],
+      () => void load(), setLive);
   }, [load]);
 
   async function startFor(group: Group) {
@@ -181,14 +214,34 @@ export function Lesson() {
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h3 className="flex-1 text-xl">Урок {group?.name}</h3>
+        <span className="flex items-center gap-2 text-sm text-muted">
+          <span className={`inline-block h-2 w-2 rounded-full
+            ${live === "живая" ? "bg-teal" : "bg-amber"}`} />
+          {live === "живая" ? "живая связь" : "связь с задержкой"}
+        </span>
         <span className="text-sm text-muted">закроется через {left} мин</span>
         <button type="button" disabled={busy} onClick={() => void stop(open)}
           className="rounded-xl bg-red/10 px-4 py-2.5 text-sm text-red">Закончить</button>
       </div>
 
       <div className="flex flex-wrap gap-2.5">
-        {order.map(r => <Tile key={r.id} r={r} onClear={() => void clearHelp(r.id)} />)}
+        {order.map(r => (
+          <Tile key={r.id} r={r}
+            onOpen={() => setOpenCard(openCard === r.id ? null : r.id)}
+            onClear={() => void clearHelp(r.id)} />
+        ))}
       </div>
+
+      {openCard !== null && (
+        <Detail
+          who={rows.find(r => r.id === openCard)?.имя ?? ""}
+          plan={details.plan.filter(x => x.student_id === openCard)}
+          answers={details.answers.filter(x => x.student_id === openCard)}
+          diag={details.diagItems.filter(x => x.student_id === openCard)}
+          tasks={tasks}
+          onClose={() => setOpenCard(null)}
+        />
+      )}
 
       <p className="mt-5 text-sm text-muted">
         Синим — кто просит подойти, нажми, когда подошёл. Чем темнее плитка, тем больше ошибок.
@@ -201,10 +254,12 @@ export function Lesson() {
 // три подряд — уже видно с другого конца стола.
 const SHADES = ["bg-paper", "bg-[#EFE6E2]", "bg-[#E3D2CA]", "bg-[#D5BCB1]"];
 
-function Tile({ r, onClear }: { r: Live; onClear: () => void }) {
+function Tile(
+  { r, onOpen, onClear }: { r: Live; onOpen: () => void; onClear: () => void }
+) {
   if (r.спросил) {
     return (
-      <button type="button" onClick={onClear}
+      <button type="button" onClick={() => { onClear(); onOpen(); }}
         className="rounded-2xl bg-[#2F6FA8] px-4 py-3 text-left text-white transition active:scale-95">
         <div className="font-read text-[19px]">{r.имя}</div>
         <div className="text-[13px] text-white/75">
@@ -216,7 +271,9 @@ function Tile({ r, onClear }: { r: Live; onClear: () => void }) {
   }
   const shade = SHADES[Math.min(r.ошибок, SHADES.length - 1)] ?? "bg-paper";
   return (
-    <div className={`rounded-2xl px-4 py-3 ${shade} ${r.начал ? "" : "opacity-50"}`}>
+    <button type="button" onClick={onOpen}
+      className={`rounded-2xl px-4 py-3 text-left transition active:scale-95
+                  ${shade} ${r.начал ? "" : "opacity-50"}`}>
       <div className="font-read text-[19px]">{r.имя}</div>
       <div className="text-[13px] text-muted">
         {r.ошибок > 0
@@ -225,6 +282,67 @@ function Tile({ r, onClear }: { r: Live; onClear: () => void }) {
           : r.план ? `${r.сделано} из ${r.план}`
           : r.начал ? "идёт" : "не начал"}
       </div>
-    </div>
+    </button>
+  );
+}
+
+// Что ребёнок делает прямо сейчас: текущая задача и всё, что он сегодня ответил.
+function Detail(
+  { who, plan, answers, diag, tasks, onClose }:
+  { who: string; plan: PlanRow[]; answers: AnswerRow[]; diag: DiagRow[];
+    tasks: Map<number, Task>; onClose: () => void }
+) {
+  const current = plan.find(p => p.status === "pending");
+  const task = current ? tasks.get(current.task_id) : undefined;
+  const rows: { task_id: number; given: string | null; ok: boolean; code: string | null }[] = [
+    ...answers.map(a => ({ task_id: a.task_id, given: a.given, ok: a.is_correct, code: a.error_code })),
+    ...diag.map(d => ({ task_id: d.task_id, given: d.given, ok: d.is_correct, code: d.error_code }))
+  ];
+
+  return (
+    <Card className="mt-5">
+      <div className="flex items-center gap-3">
+        <h4 className="flex-1 font-read text-[22px]">{who}</h4>
+        <button type="button" onClick={onClose}
+          className="rounded-xl bg-paper px-3 py-2 text-sm text-muted">Закрыть</button>
+      </div>
+
+      {task ? (
+        <div className="mt-4 rounded-2xl bg-paper p-5">
+          <p className="text-[13px] uppercase tracking-[.14em] text-muted/70">Сейчас решает</p>
+          <p className="mt-2 font-read text-[19px] leading-snug">{task.stem_ru}</p>
+          {task.answer_type === "choice" ? (
+            <p className="mt-3 text-[15px]">
+              Верно: <b>{task.options.find(o => o.is_correct)?.body}</b>
+              <span className="ml-3 text-muted">
+                варианты: {task.options.map(o => o.body).join(", ")}
+              </span>
+            </p>
+          ) : (
+            <p className="mt-3 text-[15px]">Верно: <b>{String(task.answer_num)}</b></p>
+          )}
+        </div>
+      ) : (
+        <p className="mt-4 text-muted">
+          {plan.length ? "План на сегодня закончил." : "Сейчас идёт диагностика — задачу не показываю."}
+        </p>
+      )}
+
+      <p className="mt-5 text-[13px] uppercase tracking-[.14em] text-muted/70">Сегодня ответил</p>
+      {!rows.length && <p className="mt-2 text-muted">Пока ничего.</p>}
+      <div className="mt-2 space-y-1.5">
+        {rows.map((r, i) => {
+          const t = tasks.get(r.task_id);
+          return (
+            <div key={i} className="flex flex-wrap items-baseline gap-x-3 text-[15px]">
+              <span className={r.ok ? "text-teal" : "text-red"}>{r.ok ? "верно" : "неверно"}</span>
+              <span className="text-muted">ответил {r.given === "?" ? "«не знаю»" : r.given}</span>
+              {r.code && <span className="text-amber">{r.code}</span>}
+              {t && <span className="w-full truncate text-sm text-muted/80">{t.stem_ru}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
