@@ -1,78 +1,79 @@
 // Картина знания одного ученика: узлы — темы, линии — на чём тема стоит.
-// Это иллюстрация устройства, а не чьи-то результаты, и так и подписано.
+// Строго по этажам: внизу фундамент, выше то, что на нём держится.
 
-const N = {
-  fractions:  { x: 150, y: 252, label: "Fractions",        state: "closed" },
-  order:      { x: 390, y: 252, label: "Order of ops",     state: "closed" },
-  decimals:   { x:  80, y: 176, label: "Decimals",         state: "closed" },
-  negatives:  { x: 300, y: 176, label: "Negatives",        state: "slow" },
-  part:       { x: 500, y: 176, label: "Part of a number", state: "break" },
-  percent:    { x: 420, y: 100, label: "Percentages",      state: "early" },
-  expr:       { x: 180, y: 100, label: "Expressions",      state: "closed" },
-  compound:   { x: 520, y:  30, label: "Compound %",       state: "early" },
-  equations:  { x: 130, y:  30, label: "Equations",        state: "early" }
-} as const;
+interface Node { x: number; y: number; label: string; side: "left" | "right"; state: string }
 
-type Key = keyof typeof N;
+const LEFT = 180, RIGHT = 380;
 
-const EDGES: [Key, Key][] = [
-  ["decimals", "fractions"], ["negatives", "order"],
-  ["part", "fractions"], ["part", "order"],
-  ["percent", "part"], ["percent", "decimals"],
-  ["expr", "order"], ["expr", "negatives"],
-  ["equations", "expr"], ["equations", "fractions"],
-  ["compound", "percent"]
+const NODES: Node[] = [
+  { x: LEFT,  y: 262, label: "Order of operations", side: "left",  state: "closed" },
+  { x: LEFT,  y: 188, label: "Negative numbers",    side: "left",  state: "slow" },
+  { x: LEFT,  y: 114, label: "Expressions",         side: "left",  state: "closed" },
+  { x: LEFT,  y:  40, label: "Equations",           side: "left",  state: "early" },
+  { x: RIGHT, y: 262, label: "Fractions",           side: "right", state: "closed" },
+  { x: RIGHT, y: 188, label: "Part of a number",    side: "right", state: "break" },
+  { x: RIGHT, y: 114, label: "Percentages",         side: "right", state: "early" },
+  { x: RIGHT, y:  40, label: "Compound percent",    side: "right", state: "early" }
+];
+
+const EDGES: [number, number][] = [
+  [0, 1], [1, 2], [2, 3],      // левый столб
+  [4, 5], [5, 6], [6, 7],      // правый столб
+  [4, 2]                        // связь через блоки
 ];
 
 const COLOR: Record<string, string> = {
-  closed: "#1F6F6B", slow: "#8A5A09", break: "#A8342C", early: "#C3CEC9"
+  closed: "#1F6F6B", slow: "#8A5A09", break: "#A8342C", early: "#C7D2CE"
 };
 
 const LEGEND: [string, string][] = [
-  ["closed", "Closed — and everything beneath it with it"],
+  ["closed", "Closed"],
   ["slow", "Correct, but slow"],
   ["break", "The break"],
-  ["early", "Not asked: it stands on the break"]
+  ["early", "Premature — stands on the break"]
 ];
 
 export function MapFigure() {
+  const dim = (i: number) => NODES[i]?.state === "early";
   return (
     <figure className="mt-10">
-      <svg viewBox="0 0 600 290" className="w-full" role="img"
-           aria-label="A student's topic map after one diagnostic pass">
-        {EDGES.map(([a, b]) => (
-          <line key={`${a}-${b}`} x1={N[a].x} y1={N[a].y} x2={N[b].x} y2={N[b].y}
-                stroke={N[a].state === "early" ? "#E3E9E6" : "#CBD6D2"} strokeWidth="2" />
-        ))}
-        {(Object.keys(N) as Key[]).map(k => {
-          const n = N[k];
-          const c = COLOR[n.state] ?? "#C3CEC9";
+      <svg viewBox="0 0 560 300" className="w-full" role="img"
+           aria-label="A student's topic map: closed topics, one break, and the topics suspended above it">
+        {EDGES.map(([a, b]) => {
+          const A = NODES[a], B = NODES[b];
+          if (!A || !B) return null;
           return (
-            <g key={k}>
-              <circle cx={n.x} cy={n.y} r="10" fill={c} />
-              <text x={n.x} y={n.y - 18} textAnchor="middle"
-                    fontSize="13" fill={n.state === "early" ? "#8FA09B" : "#14302E"}>
-                {n.label}
-              </text>
-            </g>
+            <line key={`${a}-${b}`} x1={A.x} y1={A.y} x2={B.x} y2={B.y}
+                  stroke={dim(a) || dim(b) ? "#E4EAE7" : "#C3D0CB"} strokeWidth="2" />
           );
         })}
+        {NODES.map((n, i) => (
+          <g key={i}>
+            <circle cx={n.x} cy={n.y} r="9" fill={COLOR[n.state] ?? "#C7D2CE"} />
+            <text
+              x={n.side === "left" ? n.x - 20 : n.x + 20}
+              y={n.y + 5}
+              textAnchor={n.side === "left" ? "end" : "start"}
+              fontSize="14"
+              fill={n.state === "early" ? "#93A29E" : "#14302E"}
+            >{n.label}</text>
+          </g>
+        ))}
       </svg>
 
-      <figcaption className="mt-4 grid gap-2 sm:grid-cols-2">
+      <figcaption className="mt-5 flex flex-wrap gap-x-7 gap-y-2">
         {LEGEND.map(([k, text]) => (
-          <span key={k} className="flex items-start gap-2.5 text-[14px] text-muted">
-            <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ background: COLOR[k] }} />
+          <span key={k} className="flex items-center gap-2 text-[14px] text-muted">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLOR[k] }} />
             {text}
           </span>
         ))}
       </figcaption>
 
       <p className="mt-5 text-[13px] leading-relaxed text-muted/80">
-        An illustration of how the map is read, not a record of anyone's results.
-        Percentages here were never asked: they stand on a topic that had already
-        broken, and asking them would have measured nothing.
+        An illustration of how the map is read, not a record of results. Percentages and
+        everything above them were never asked: they stand on a topic already known to
+        have broken, and asking them would have measured nothing.
       </p>
     </figure>
   );

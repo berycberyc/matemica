@@ -10,6 +10,29 @@ const ERRORS: Record<string, string> = {
   offline: "Connection failed. Try again."
 };
 
+const PRINCIPLES: [string, string][] = [
+  ["Directed Graph of Knowledge Architecture — 78 concepts, 96 dependencies",
+   "The curriculum is structured not as a linear list, but as a strictly hierarchical " +
+   "directed acyclic graph. Every cognitive concept is functionally tied to its " +
+   "underlying prerequisites."],
+  ["Adaptive Recursive Testing",
+   "The assessment algorithm operates recursively. Upon a correct response, the testing " +
+   "trajectory advances toward higher conceptual complexity. When an error occurs, the " +
+   "trajectory shifts downward toward foundational mechanics."],
+  ["Filtering of Dependent Concepts",
+   "If a gap is detected in a core prerequisite, evaluation of higher-level dependent " +
+   "topics is suspended. These topics are categorized as premature rather than unknown, " +
+   "preventing misdiagnosis and optimizing instructional time."],
+  ["Differentiated Distractor Analysis",
+   "Every incorrect answer option models a specific, named cognitive error — misapplying " +
+   "the order of operations, averaging rates incorrectly. This provides precise data to " +
+   "structure subsequent targeted remediation."],
+  ["Procedural Fluency and Response Latency",
+   "Response speed is an integral metric alongside accuracy. A correct answer delivered " +
+   "with excessive latency indicates that the student is re-deriving the method rather " +
+   "than demonstrating mastery, signalling an unstable foundation below."]
+];
+
 export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
   const [login, setLogin] = useState("");
   const [pass, setPass] = useState("");
@@ -32,61 +55,62 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
     }
   }
 
+  const field = "mt-1 w-full rounded-xl bg-paper px-4 py-3 text-lg outline-none " +
+                "focus:ring-2 focus:ring-teal";
+
   return (
-    <div className="mx-auto grid max-w-5xl gap-14 px-6 py-14 md:grid-cols-[1.15fr_1fr] md:py-24">
+    <div className="mx-auto grid max-w-5xl gap-14 px-6 py-12 md:grid-cols-[1.15fr_1fr] md:py-20">
       <div>
         <div className="flex items-center gap-3">
-          <img src="/icon-192.png" alt="" width={40} height={40}
-               className="rounded-[11px]" />
+          <img src="/icon-192.png" alt="" width={40} height={40} className="rounded-[11px]" />
           <span className="text-[17px] tracking-wide text-teal">matemica</span>
         </div>
-        <h1 className="mt-4 font-read text-[34px] leading-[1.25] md:text-[42px]">
-          A gap in mathematics is rarely where the mistake appears.
+
+        <h1 className="mt-6 font-read text-[30px] leading-[1.25] md:text-[36px]">
+          A Graph-Based Hierarchical Model for Mathematical Knowledge Diagnostics
         </h1>
-        <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-muted">
-          Percentages fail because parts of a number failed two years earlier. Equations fail
-          because of the order of operations. This system looks for the break itself, not the
-          symptom above it.
+
+        <h2 className="mt-9 text-[13px] uppercase tracking-[.16em] text-muted/70">
+          Abstract and conceptual foundation
+        </h2>
+        <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted">
+          A primary challenge in mathematical assessment is distinguishing between the point
+          of origin of a cognitive deficiency and its surface-level manifestation. A student's
+          errors in compound percentages or algebraic equations rarely stem from an inability
+          to grasp those specific topics; rather, they arise from unaddressed gaps in
+          foundational prerequisites, such as calculating parts of a number or mastering the
+          order of operations.
+        </p>
+        <p className="mt-4 max-w-xl text-[17px] leading-relaxed text-muted">
+          This diagnostic framework bypasses superficial symptoms to isolate and identify the
+          underlying structural dysfunction within a student's knowledge base.
         </p>
 
         <MapFigure />
 
-        <div className="mt-12 space-y-6 border-t border-line pt-8">
-          <Section
-            title="Seventy-eight topics, ninety-six dependencies"
-            body="Every topic knows what it stands on. The map is a graph, not a list, so a wrong
-                  answer has somewhere to lead."
-          />
-          <Section
-            title="The next question depends on the last answer"
-            body="Answer well and the questions climb until they stop being easy. Miss, and the
-                  check descends toward the foundation. No two students take the same path."
-          />
-          <Section
-            title="Topics above a break are never asked"
-            body="They are marked too early rather than unknown. Those are different states, and
-                  confusing them wastes a term of teaching."
-          />
-          <Section
-            title="Every wrong option carries a named error"
-            body="Not incorrect, but took the average of two speeds. That is what makes a plan
-                  possible afterwards."
-          />
-          <Section
-            title="Speed is part of the measurement"
-            body="An answer that is correct but slow does not close the topics beneath it.
-                  A student who re-derives the method every time is standing on something thin."
-          />
+        <h2 className="mt-12 border-t border-line pt-8 text-[13px] uppercase
+                       tracking-[.16em] text-muted/70">
+          Key principles of the diagnostic algorithm
+        </h2>
+        <div className="mt-5 space-y-6">
+          {PRINCIPLES.map(([title, body]) => (
+            <div key={title}>
+              <h3 className="text-[17px] leading-snug">{title}</h3>
+              <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-muted">{body}</p>
+            </div>
+          ))}
         </div>
 
-        <p className="mt-12 border-t border-line pt-8 text-[14px] leading-relaxed text-muted">
-          Built for one teacher's practice, and shaped by it. Nothing here is a claim
-          about results; it is a description of how the diagnostic works.
+        <p className="mt-12 border-t border-line pt-8 text-[15px] leading-relaxed text-muted">
+          Designed as an institutional tool to enhance teaching practice and diagnostic
+          precision, providing educators with actionable data to structure effective
+          learning trajectories.
         </p>
       </div>
 
       <div className="md:pt-16">
-        <div className="rounded-[20px] bg-white p-7 shadow-[0_1px_2px_rgba(20,48,46,.06)]">
+        <div className="rounded-[20px] bg-white p-7 shadow-[0_1px_2px_rgba(20,48,46,.06)]
+                        md:sticky md:top-8">
           <h2 className="text-lg">Sign in</h2>
           <p className="mt-1 text-sm text-muted">
             {teacherMode ? "Letters and digits." : "Digits only, both fields."}
@@ -98,9 +122,7 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
           <input
             id="login" inputMode={teacherMode ? "text" : "numeric"}
             autoComplete="off" autoCapitalize="off"
-            value={login} onChange={e => setLogin(e.target.value)}
-            className="mt-1 w-full rounded-xl bg-paper px-4 py-3 text-lg outline-none
-                       focus:ring-2 focus:ring-teal"
+            value={login} onChange={e => setLogin(e.target.value)} className={field}
           />
 
           <label className="mt-4 block text-sm text-muted" htmlFor="code">Code</label>
@@ -108,20 +130,18 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
             id="code" inputMode={teacherMode ? "text" : "numeric"}
             type={show ? "text" : "password"} autoComplete="off" autoCapitalize="off"
             value={pass} onChange={e => setPass(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") void submit(); }}
-            className="mt-1 w-full rounded-xl bg-paper px-4 py-3 text-lg outline-none
-                       focus:ring-2 focus:ring-teal"
+            onKeyDown={e => { if (e.key === "Enter") void submit(); }} className={field}
           />
-          <button
-            type="button" onClick={() => setShow(v => !v)}
-            className="mt-2 text-sm text-muted underline-offset-2 hover:underline"
-          >{show ? "Hide code" : "Show code"}</button>
+          <button type="button" onClick={() => setShow(v => !v)}
+            className="mt-2 text-sm text-muted underline-offset-2 hover:underline">
+            {show ? "Hide code" : "Show code"}
+          </button>
 
-          <button
-            type="button" onClick={() => void submit()} disabled={busy}
+          <button type="button" onClick={() => void submit()} disabled={busy}
             className="mt-6 w-full rounded-2xl bg-teal px-4 py-4 text-[17px] text-white
-                       transition active:scale-[.99] active:bg-teal-dark disabled:opacity-50"
-          >{busy ? "…" : "Sign in"}</button>
+                       transition active:scale-[.99] active:bg-teal-dark disabled:opacity-50">
+            {busy ? "…" : "Sign in"}
+          </button>
 
           {error && <p className="mt-3 text-sm text-red">{error}</p>}
 
@@ -131,15 +151,6 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Section({ title, body }: { title: string; body: string }) {
-  return (
-    <div>
-      <h3 className="text-[17px]">{title}</h3>
-      <p className="mt-1 max-w-xl text-[15px] leading-relaxed text-muted">{body}</p>
     </div>
   );
 }
