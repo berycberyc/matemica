@@ -34,6 +34,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
 
   const engine = useRef<Engine | null>(null);
   const session = useRef<Session | null>(null);
+  const allSessions = useRef<Session[]>([]);
   const items = useRef<Item[]>([]);   // текущий заход
   const all = useRef<Item[]>([]);     // все заходы, для восстановления состояния
   const tasks = useRef<Task[]>([]);
@@ -42,6 +43,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   const extra = useRef<Task[]>([]);
   const shownAt = useRef(0);
   const supervised = useRef(false);
+  const savedStates = useRef<Map<number, string>>(new Map());
 
   const load = useCallback(async () => {
     setPhase({ kind: "loading" });
@@ -68,31 +70,29 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
         supervised.current = open.length > 0;
       }
 
+      // Заход не заводим заранее: иначе у каждого ребёнка навсегда повиснет
+      // пустой «начатый» заход. Создадим, когда он нажмёт «Начать».
       const sessions = await api.all<Session>("diag_sessions",
         `student_id=eq.${user.id}&select=*&order=pass_no.asc`);
-      let current = sessions.find(x => x.status === "in_progress");
-      if (!current) {
-        const passNo = sessions.length ? Math.max(...sessions.map(r => r.pass_no)) + 1 : 1;
-        const made = await api.post<Session>("diag_sessions",
-          [{ student_id: user.id, pass_no: passNo, supervised: supervised.current }]);
-        current = made[0];
-        if (current) sessions.push(current);
-      }
-      if (!current) throw new Error("не удалось начать заход");
+      const current = sessions.find(x => x.status === "in_progress") ?? null;
       session.current = current;
+      allSessions.current = sessions;
 
-      // Восстанавливаем состояние по ВСЕМ заходам: второй продолжает первый,
-      // а не начинает измерение заново.
+      // Состояние восстанавливаем по ВСЕМ заходам: второй продолжает первый.
       const ids = sessions.map(x => x.id).join(",");
       const everything = ids
         ? await api.all<Item>("diag_items",
             `session_id=in.(${ids})&select=*&order=session_id.asc,pos.asc`)
         : [];
       all.current = everything;
-      items.current = everything.filter(x => x.session_id === current.id);
+      items.current = current ? everything.filter(x => x.session_id === current.id) : [];
       const e = build(topicRows, deps, taskRows);
       replay(e, everything);
       engine.current = e;
+
+      const known = await api.all<{ topic_ord: number; state: string }>("topic_status",
+        `student_id=eq.${user.id}&select=topic_ord,state`);
+      savedStates.current = new Map(known.map(k => [k.topic_ord, k.state]));
 
       const [planRows, answers] = await Promise.all([
         api.all<PlanRow>("plan_items",
@@ -149,12 +149,31 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
     return () => clearInterval(id);
   }, [phase.kind, load]);
 
-  function nextDiagnostic() {
+  async function nextDiagnostic() {
     const e = engine.current;
     if (!e) return;
-    if (items.current.length >= MAX_PER_PASS) { void finishPass("пауза"); return; }
+    if (session.current && items.current.length >= MAX_PER_PASS) {
+      await finishPass("пауза");
+      return;
+    }
     const next = pickNext(e);
-    if (!next) { void finishPass("конец"); return; }
+    if (!next) { await finishPass("конец"); return; }
+    if (!session.current) {
+      const passNo = allSessions.current.length
+        ? Math.max(...allSessions.current.map(r => r.pass_no)) + 1 : 1;
+      try {
+        const made = await api.post<Session>("diag_sessions",
+          [{ student_id: user.id, pass_no: passNo, supervised: supervised.current }]);
+        const s = made[0];
+        if (!s) throw new Error("не удалось начать заход");
+        session.current = s;
+        allSessions.current.push(s);
+        items.current = [];
+      } catch (err) {
+        setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+        return;
+      }
+    }
     shownAt.current = performance.now();
     setPhase({ kind: "diagnostic", task: next });
   }
@@ -164,6 +183,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
     if (s) {
       await api.patch("diag_sessions", `id=eq.${s.id}`,
         { status: "done", finished_at: new Date().toISOString() }).catch(() => undefined);
+      session.current = null;
     }
     setPhase({ kind: "diagDone", pause: why === "пауза" });
   }
@@ -212,7 +232,30 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
     all.current.push(row);
     e.used.add(task.id);
     apply(e, task.topic_ord, task.level, verdict.correct, seconds, task.target_seconds, given === "?");
-    nextDiagnostic();
+    await saveStates(e);
+    void nextDiagnostic();
+  }
+
+  // Карта тем должна лежать в базе, а не только в телефоне: иначе после захода
+  // видно ответы, но не видно, что из них насчитано.
+  async function saveStates(e: Engine) {
+    const rows: unknown[] = [];
+    for (const [topic_ord, state] of e.status) {
+      if (savedStates.current.get(topic_ord) === state) continue;
+      savedStates.current.set(topic_ord, state);
+      rows.push({
+        student_id: user.id, topic_ord, state,
+        closed_on: state === "ok" || state === "ok_inferred" ? day() : null,
+        evidence: "диагностика",
+        updated_at: new Date().toISOString()
+      });
+    }
+    if (!rows.length) return;
+    try {
+      await api.upsert("topic_status", "student_id,topic_ord", rows);
+    } catch {
+      put("topic_status", rows[0]);   // не потеряем, уйдёт позже
+    }
   }
 
   // Такая же задача, но другая: после ошибки дома даём вторую попытку на том же месте,
@@ -288,7 +331,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
 
       {phase.kind === "home" && home && (
         <Home name={user.full_name} lang={user.lang} data={home}
-              onDiag={nextDiagnostic} onPlan={nextPractice} onTopic={openTopic} />
+              onDiag={() => void nextDiagnostic()} onPlan={nextPractice} onTopic={openTopic} />
       )}
 
       {phase.kind === "diagDone" && (

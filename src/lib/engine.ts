@@ -85,7 +85,9 @@ export function apply(
     return;
   }
 
-  if (level > 1) {                                          // не вышло наверху — проверим низ
+  // «Не знаю» второго вопроса не требует: ребёнок уже сказал прямо.
+  // Спрашивать то же самое этажом ниже — трата полутора минут.
+  if (!dontKnow && level > 1) {                             // не вышло наверху — проверим низ
     e.nextLevel.set(topic, level - 1);
     e.cameDown.add(topic);
     e.focus.push(topic);

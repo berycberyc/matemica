@@ -62,7 +62,8 @@ function Export({ onError }: { onError: (m: string) => void }) {
     setBusy(true);
     setLabel("Собираю…");
     try {
-      const [groups, students, topics, deps, tasks, sessions, items, help] = await Promise.all([
+      const [groups, students, topics, deps, tasks, sessions, items, help, states] =
+        await Promise.all([
         api.all("groups", "select=*"),
         api.all("users", "role=eq.student&select=id,full_name,login,group_id,lang,note,is_active"),
         api.all("topics", "select=*"),
@@ -70,15 +71,18 @@ function Export({ onError }: { onError: (m: string) => void }) {
         api.all("tasks", "select=id,topic_ord,level,answer_type,answer_num,target_seconds,stem_ru"),
         api.all("diag_sessions", "select=*"),
         api.all<Item>("diag_items", "select=*"),
-        api.all("help_requests", "select=*")
+        api.all("help_requests", "select=*"),
+        api.all("topic_status", "select=*")
       ]);
       const data = {
         выгружено: new Date().toISOString(),
         группы: groups, ученики: students, темы: topics, зависимости: deps,
         задачи: tasks, заходы: sessions, ответы: items, нажатия_спросить: help,
+        состояния_тем: states,
         сводка: {
           учеников: students.length, заходов: sessions.length, ответов: items.length,
-          при_учителе: items.filter(i => i.supervised === true).length
+          при_учителе: items.filter(i => i.supervised === true).length,
+          состояний: states.length
         }
       };
       const url = URL.createObjectURL(

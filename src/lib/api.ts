@@ -38,6 +38,14 @@ export const api = {
   patch<T>(table: string, query: string, body: unknown): Promise<T[]> {
     return call<T[]>(`${table}?${query}`, { method: "PATCH", body: JSON.stringify(body) });
   },
+  // Запись «поверх»: если строка на эту пару уже есть — обновляется.
+  upsert<T>(table: string, onConflict: string, rows: unknown[]): Promise<T[]> {
+    return call<T[]>(`${table}?on_conflict=${onConflict}`, {
+      method: "POST",
+      body: JSON.stringify(rows),
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" }
+    });
+  },
   del(table: string, query: string): Promise<unknown[]> {
     return call<unknown[]>(`${table}?${query}`, { method: "DELETE" });
   }

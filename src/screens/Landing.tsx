@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { signIn, store } from "../lib/auth";
+import { MapFigure } from "../components/MapFigure";
 import type { User } from "../lib/types";
 
 const ERRORS: Record<string, string> = {
@@ -34,7 +35,11 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
   return (
     <div className="mx-auto grid max-w-5xl gap-14 px-6 py-14 md:grid-cols-[1.15fr_1fr] md:py-24">
       <div>
-        <p className="text-sm tracking-wide text-teal">matemica</p>
+        <div className="flex items-center gap-3">
+          <img src="/icon-192.png" alt="" width={40} height={40}
+               className="rounded-[11px]" />
+          <span className="text-[17px] tracking-wide text-teal">matemica</span>
+        </div>
         <h1 className="mt-4 font-read text-[34px] leading-[1.25] md:text-[42px]">
           A gap in mathematics is rarely where the mistake appears.
         </h1>
@@ -44,7 +49,9 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
           symptom above it.
         </p>
 
-        <div className="mt-10 space-y-6 border-t border-line pt-8">
+        <MapFigure />
+
+        <div className="mt-12 space-y-6 border-t border-line pt-8">
           <Section
             title="Seventy-eight topics, ninety-six dependencies"
             body="Every topic knows what it stands on. The map is a graph, not a list, so a wrong
@@ -65,7 +72,17 @@ export function Landing({ onSignedIn }: { onSignedIn: (u: User) => void }) {
             body="Not incorrect, but took the average of two speeds. That is what makes a plan
                   possible afterwards."
           />
+          <Section
+            title="Speed is part of the measurement"
+            body="An answer that is correct but slow does not close the topics beneath it.
+                  A student who re-derives the method every time is standing on something thin."
+          />
         </div>
+
+        <p className="mt-12 border-t border-line pt-8 text-[14px] leading-relaxed text-muted">
+          Built for one teacher's practice, and shaped by it. Nothing here is a claim
+          about results; it is a description of how the diagnostic works.
+        </p>
       </div>
 
       <div className="md:pt-16">
