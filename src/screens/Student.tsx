@@ -10,6 +10,8 @@ import { Question } from "./Question";
 import { apply, build, judge, pickNext, replay, type Engine } from "../lib/engine";
 import type { Dep, Item, Option, Session, Task, Topic, User } from "../lib/types";
 
+const MAX_PER_PASS = 30;   // столько вопросов за один заход, дальше — в другой раз
+
 interface PlanRow { id: number; task_id: number; pos: number }
 interface AnswerRow { topic_ord: number; created_at: string }
 
@@ -20,7 +22,7 @@ type Phase =
   | { kind: "diagnostic"; task: Task }
   | { kind: "practice"; task: Task; left: number; retry: boolean }
   | { kind: "verdict"; correct: boolean; again: Task | null; left: number }
-  | { kind: "diagDone" };
+  | { kind: "diagDone"; pause: boolean };
 
 
 
@@ -32,7 +34,8 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
 
   const engine = useRef<Engine | null>(null);
   const session = useRef<Session | null>(null);
-  const items = useRef<Item[]>([]);
+  const items = useRef<Item[]>([]);   // текущий заход
+  const all = useRef<Item[]>([]);     // все заходы, для восстановления состояния
   const tasks = useRef<Task[]>([]);
   const topics = useRef<Map<number, Topic>>(new Map());
   const queue = useRef<PlanRow[]>([]);
@@ -65,25 +68,30 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
         supervised.current = open.length > 0;
       }
 
-      const running = await api.get<Session>("diag_sessions",
-        `student_id=eq.${user.id}&status=eq.in_progress&select=*&order=pass_no.desc&limit=1`);
-      let current = running[0];
+      const sessions = await api.all<Session>("diag_sessions",
+        `student_id=eq.${user.id}&select=*&order=pass_no.asc`);
+      let current = sessions.find(x => x.status === "in_progress");
       if (!current) {
-        const all = await api.get<{ pass_no: number }>("diag_sessions",
-          `student_id=eq.${user.id}&select=pass_no`);
-        const passNo = all.length ? Math.max(...all.map(r => r.pass_no)) + 1 : 1;
+        const passNo = sessions.length ? Math.max(...sessions.map(r => r.pass_no)) + 1 : 1;
         const made = await api.post<Session>("diag_sessions",
           [{ student_id: user.id, pass_no: passNo, supervised: supervised.current }]);
         current = made[0];
+        if (current) sessions.push(current);
       }
       if (!current) throw new Error("не удалось начать заход");
       session.current = current;
 
-      const saved = await api.all<Item>("diag_items",
-        `session_id=eq.${current.id}&select=*&order=pos.asc`);
-      items.current = saved;
+      // Восстанавливаем состояние по ВСЕМ заходам: второй продолжает первый,
+      // а не начинает измерение заново.
+      const ids = sessions.map(x => x.id).join(",");
+      const everything = ids
+        ? await api.all<Item>("diag_items",
+            `session_id=in.(${ids})&select=*&order=session_id.asc,pos.asc`)
+        : [];
+      all.current = everything;
+      items.current = everything.filter(x => x.session_id === current.id);
       const e = build(topicRows, deps, taskRows);
-      replay(e, saved);
+      replay(e, everything);
       engine.current = e;
 
       const [planRows, answers] = await Promise.all([
@@ -120,7 +128,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
         solvedYesterday: answers.filter(a => a.created_at.slice(0, 10) === day(-1)).length,
         streak,
         passed,
-        diagStarted: saved.length > 0,
+        diagStarted: everything.length > 0,
         diagDone: !pickNext(e)
       });
       setPhase({ kind: "home" });
@@ -144,18 +152,20 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
   function nextDiagnostic() {
     const e = engine.current;
     if (!e) return;
+    if (items.current.length >= MAX_PER_PASS) { void finishPass("пауза"); return; }
     const next = pickNext(e);
-    if (!next) {
-      const s = session.current;
-      if (s) {
-        void api.patch("diag_sessions", `id=eq.${s.id}`,
-          { status: "done", finished_at: new Date().toISOString() }).catch(() => undefined);
-      }
-      setPhase({ kind: "diagDone" });
-      return;
-    }
+    if (!next) { void finishPass("конец"); return; }
     shownAt.current = performance.now();
     setPhase({ kind: "diagnostic", task: next });
+  }
+
+  async function finishPass(why: "пауза" | "конец") {
+    const s = session.current;
+    if (s) {
+      await api.patch("diag_sessions", `id=eq.${s.id}`,
+        { status: "done", finished_at: new Date().toISOString() }).catch(() => undefined);
+    }
+    setPhase({ kind: "diagDone", pause: why === "пауза" });
   }
 
   function nextPractice() {
@@ -199,6 +209,7 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
       setQueued(pending());
     }
     items.current.push(row);
+    all.current.push(row);
     e.used.add(task.id);
     apply(e, task.topic_ord, task.level, verdict.correct, seconds, task.target_seconds, given === "?");
     nextDiagnostic();
@@ -282,7 +293,9 @@ export function Student({ user, onExit }: { user: User; onExit: () => void }) {
 
       {phase.kind === "diagDone" && (
         <Card>
-          <p className="font-read text-lg leading-relaxed">{t.finished}</p>
+          <p className="font-read text-lg leading-relaxed">
+            {phase.pause ? t.pause : t.finished}
+          </p>
           <div className="mt-5"><Primary onClick={() => void load()}>{t.done}</Primary></div>
         </Card>
       )}
